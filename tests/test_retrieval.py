@@ -55,6 +55,23 @@ def test_filters_restrict_results():
     assert search(idx, "cloud", {"ticker": "ZZZ"}, embedder=EMB) == []
 
 
+def test_cross_year_dedup_keeps_latest_and_lists_years():
+    same = "we depend on a limited number of suppliers for advanced packaging capacity " * 5
+    s = pd.DataFrame(
+        [
+            sec("AAA", fy, "1A", same) | {"period_end": f"{fy}-01-25"}
+            for fy in ("2024", "2025", "2026")
+        ]
+        + [sec("AAA", "2026", "7", same) | {"period_end": "2026-01-25"}]  # other item: kept
+    )
+    idx = build_index(s, EMB, 320, 60)
+    hits = search(idx, "limited suppliers advanced packaging", embedder=EMB)
+    one_a = [h for h in hits if h.item == "1A"]
+    assert len(one_a) == 1 and one_a[0].fy == "2026"
+    assert one_a[0].also_in == ("2024", "2025")
+    assert any(h.item == "7" for h in hits)
+
+
 def test_search_top_hit_and_bm25_only():
     idx = toy_index()
     assert search(idx, "export controls China chips", embedder=EMB)[0].ticker == "AAA"

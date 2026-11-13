@@ -1,5 +1,6 @@
 """Extractive answers and the Ask page (fixture index + FakeEmbedder: no network)."""
 
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -7,6 +8,7 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 from secanalyst.answer.extractive import NO_MATCH, answer, citation, key_sentences
+from secanalyst.config import load_settings
 from secanalyst.retrieval.embedding import FakeEmbedder
 from secanalyst.retrieval.search import Hit, build_index, search
 
@@ -54,13 +56,17 @@ def test_out_of_scope_returns_no_match():
     idx = fixture_index()
     a = answer(idx, "What is Apple's share price today?", EMB, score_floor=0.3)
     assert a.message == NO_MATCH and a.hits == [] and a.sentences == []
-    pat = [r"\b(share|stock) (price|quote)"]
+    pat = load_settings().out_of_scope_patterns
     g = answer(
         idx, "What is Apple's share price today?", EMB, score_floor=0.0, out_of_scope_patterns=pat
     )
     assert g.message == NO_MATCH  # semantically close to real passages: pattern guard
     ok = answer(idx, "export controls on chips to China", EMB, score_floor=0.3)
     assert ok.message is None and ok.hits and ok.sentences
+    q = "Why might Tesla's stock price be volatile?"  # no temporal cue: stays in scope
+    assert not any(re.search(p, q, re.IGNORECASE) for p in pat)
+    for bad in ["current stock price of Tesla", "What is the share price now", "should I buy NVDA"]:
+        assert any(re.search(p, bad, re.IGNORECASE) for p in pat), bad
 
 
 def test_bm25_only_uses_lexical_floor():

@@ -31,8 +31,11 @@ if embedder is None:
 chunks = index.chunks
 ALL = "All"
 c1, c2, c3, c4 = st.columns(4)
-company = c1.selectbox("Company", [ALL] + sorted(chunks["ticker"].unique()), key="f_company")
-year = c2.selectbox("Fiscal year", [ALL] + sorted(chunks["fiscal_year"].unique()), key="f_year")
+company_options = [ALL] + sorted(chunks["ticker"].unique())
+company = c1.selectbox("Company", company_options, key="f_company")
+year = c2.selectbox(
+    "Fiscal year", [ALL] + sorted(chunks["fiscal_year"].unique(), reverse=True), key="f_year"
+)
 form = c3.selectbox("Form", [ALL] + sorted(chunks["form"].unique()), key="f_form")
 item = c4.selectbox("Item", [ALL] + sorted(chunks["item"].unique()), key="f_item")
 
@@ -43,7 +46,8 @@ for i, q in enumerate(questions):
 
     def _pick(q=q):
         st.session_state["question"] = q["question"]
-        st.session_state["f_company"] = q["ticker"] or ALL
+        t = q["ticker"]
+        st.session_state["f_company"] = t if t in company_options else ALL
 
     cols[i % 2].button(q["question"], key=f"ex_{q['id']}", on_click=_pick, width="stretch")
 
@@ -72,6 +76,8 @@ if query.strip():
         for h in res.hits:
             with st.expander(citation(h) + f"  ·  relevance {h.relevance:.2f}"):
                 st.badge(citation(h))
+                if h.also_in:
+                    st.caption("also in " + ", ".join(f"FY{y}" for y in h.also_in))
                 st.write(h.text)
 
 footer()

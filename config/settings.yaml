@@ -12,11 +12,12 @@ score_floor: 0.60
 # questions filtered by company and year, <= 0.50 for off-topic queries)
 lexical_floor: 0.55
 out_of_scope_patterns:
-  - '\b(share|stock) (price|quote)'
-  - '\b(price|quote) (of|for) .{0,30}\b(share|stock)s?\b'
-  - '\btrading at\b'
+  # share/stock price (or quote) with a temporal cue within ~40 characters, either order
+  - '\b(current|currently|today|now|latest|right now)\b.{0,40}\b(share|stock) (price|quote)'
+  - '\b(share|stock) (price|quote)s?\b.{0,40}\b(current|currently|today|now|latest|right now)\b'
   - '\bprice target\b'
-  - '\b(should i|can i) (buy|sell)\b'
+  - '\btrading at\b'
+  - '\bshould i (buy|sell)\b'
 daily_llm_cap: 50
 user_agent_default: "sec-filings-ai-analyst research project"
 disclaimer: "Educational project — not investment advice. Source: SEC EDGAR."

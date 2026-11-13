@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -35,6 +35,7 @@ class Hit:
     text: str
     period_end: str = ""
     relevance: float = 0.0  # absolute: cosine of best vector match, or lexical coverage
+    also_in: tuple[str, ...] = ()  # other fiscal years with near-identical text
 
 
 class Index:
@@ -43,8 +44,16 @@ class Index:
         self.vectors = None if vectors is None else np.asarray(vectors, dtype=np.float16)
         if self.vectors is not None and len(self.vectors) != len(self.chunks):
             raise ValueError("vectors and chunks differ in length")
+        self._f32: np.ndarray | None = None
         self._tokens = [tokenize(t) for t in self.chunks["text"]]
         self._bm25 = BM25Plus(self._tokens) if self._tokens else None
+
+    @property
+    def vectors32(self) -> np.ndarray:
+        """float32 copy of the vectors, built once (search runs a matmul per query)."""
+        if self._f32 is None:
+            self._f32 = self.vectors.astype(np.float32)
+        return self._f32
 
     def save(self, out_dir: Path | str) -> None:
         out_dir = Path(out_dir)
@@ -107,10 +116,10 @@ def search(
     rankings = [bm_order]
     cos = None
     if embedder is not None and index.vectors is not None:
-        cos = index.vectors.astype(np.float32) @ np.asarray(embedder.embed_query(query), "f4")
+        cos = index.vectors32 @ np.asarray(embedder.embed_query(query), "f4")
         rankings.append([int(i) for i in cand[np.argsort(-cos[cand], kind="stable")][:POOL]])
     fused = rrf(rankings)
-    top = sorted(fused, key=lambda i: (-fused[i], i))[:k]
+    top = sorted(fused, key=lambda i: (-fused[i], i))[: k * 3]
     qset = set(q)
     rows = index.chunks
     hits = []
@@ -124,7 +133,41 @@ def search(
             Hit(r["chunk_id"], fused[i], r["ticker"], r["form"], r["fiscal_year"], r["item"],
                 r["text"], r["period_end"], rel)
         )  # fmt: skip
-    return hits
+    return _dedup_years(hits)[:k]
+
+
+def _grams(text: str, n: int = 5) -> set[tuple[str, ...]]:
+    w = text.lower().split()
+    return {tuple(w[i : i + n]) for i in range(max(len(w) - n + 1, 1))}
+
+
+def near_duplicate(a: Hit, b: Hit, threshold: float = 0.8) -> bool:
+    """Same company/form/item and the same text: identical first 12 words or 5-gram Jaccard."""
+    if (a.ticker, a.form, a.item) != (b.ticker, b.form, b.item):
+        return False
+    if a.text.lower().split()[:12] == b.text.lower().split()[:12]:
+        return True
+    ga, gb = _grams(a.text), _grams(b.text)
+    return len(ga & gb) / len(ga | gb) >= threshold
+
+
+def _dedup_years(hits: list[Hit]) -> list[Hit]:
+    """Collapse the same passage repeated across fiscal years into one hit (the latest year),
+    listing the other years in ``also_in``. Rank and score stay those of the best-ranked copy."""
+    kept: list[Hit] = []
+    for h in hits:
+        for j, k_ in enumerate(kept):
+            if near_duplicate(k_, h):
+                latest = max((k_, h), key=lambda x: (x.period_end, x.fy))
+                years = {k_.fy, h.fy, *k_.also_in} - {latest.fy}
+                kept[j] = replace(
+                    latest, score=k_.score, relevance=max(k_.relevance, h.relevance),
+                    also_in=tuple(sorted(years)),
+                )  # fmt: skip
+                break
+        else:
+            kept.append(h)
+    return kept
 
 
 def _norm_ws(s: str) -> str:

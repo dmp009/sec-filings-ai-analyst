@@ -181,15 +181,26 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="secanalyst.pipeline")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("ingest", help="download EDGAR raw data for all companies")
-    sub.add_parser("build", help="raw data -> warehouse, quality report and parquet snapshot")
+    b = sub.add_parser("build", help="raw data -> warehouse, quality report and parquet snapshot")
+    b.add_argument(
+        "--skip-index",
+        action="store_true",
+        help="do not re-embed when chunks.parquet is newer than fact_sections.parquet",
+    )
     sub.add_parser("index", help="chunk + embed sections into chunks.parquet and vectors.npy")
     sub.add_parser("eval", help="recall@5 and MRR on data/eval/retrieval_eval.yaml")
     args = ap.parse_args(argv)
     if args.cmd == "ingest":
         ingest()
     elif args.cmd == "build":
-        build()
-        index()
+        d = snapshot.SNAPSHOT_DIR
+        secs_file = d / "fact_sections.parquet"
+        before = secs_file.read_bytes() if secs_file.exists() else None
+        build()  # rewrites every parquet, so mtimes are useless: compare the sections content
+        if args.skip_index and (d / "chunks.parquet").exists() and before == secs_file.read_bytes():
+            print("index: sections unchanged, skipped")
+        else:
+            index()
     elif args.cmd == "index":
         index()
     elif args.cmd == "eval":
