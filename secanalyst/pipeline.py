@@ -1,4 +1,4 @@
-"""Pipeline CLI: `python -m secanalyst.pipeline ingest`."""
+"""Pipeline CLI: `python -m secanalyst.pipeline ingest|build`."""
 
 from __future__ import annotations
 
@@ -6,11 +6,23 @@ import argparse
 import json
 from dataclasses import asdict
 from datetime import UTC, date, datetime
+from pathlib import Path
 
-from secanalyst.config import REPO_ROOT, load_companies, load_settings
+import pandas as pd
+
+from secanalyst.config import REPO_ROOT, load_companies, load_settings, load_xbrl_tags
+from secanalyst.financials.facts import extract_annual
+from secanalyst.financials.ratios import compute_ratios
 from secanalyst.ingest import edgar
+from secanalyst.parse import sections
+from secanalyst.warehouse import quality, snapshot, store
 
 RAW = REPO_ROOT / "data" / "raw"
+MANIFEST = RAW / "manifest.json"
+REPORT = REPO_ROOT / "data_quality_report.md"
+FILING_COLUMNS = [
+    "filing_id", "ticker", "form", "accession", "filing_date", "period_end", "fiscal_year_label",
+]  # fmt: skip
 
 
 def ingest(client: edgar.EdgarClient | None = None, as_of: date | None = None) -> dict:
@@ -44,13 +56,94 @@ def ingest(client: edgar.EdgarClient | None = None, as_of: date | None = None) -
     return manifest
 
 
+def _parse(manifest: dict, root: Path, with_sections: bool):
+    filings, secs = [], []
+    for ticker, entry in manifest["companies"].items():
+        for f in entry["filings"]:
+            html = sections.parse_html((root / f["path"]).read_bytes())
+            label, pe = sections.fiscal_year_label(html), sections.period_end(html)
+            filings.append(
+                {"filing_id": f["accession"], "ticker": ticker, "form": f["form"],
+                 "accession": f["accession"], "filing_date": date.fromisoformat(f["filing_date"]),
+                 "period_end": pe, "fiscal_year_label": label}
+            )  # fmt: skip
+            if with_sections:
+                ref = edgar.FilingRef(
+                    ticker=ticker, cik=f["cik"], form=f["form"], accession=f["accession"],
+                    filing_date=date.fromisoformat(f["filing_date"]), period_end=pe,
+                    primary_doc_url=f["primary_doc_url"],
+                )  # fmt: skip
+                items = sections.split_items(sections.html_to_text(html), f["form"])
+                secs.append(sections.section_rows(ref, label, items))
+    fil = pd.DataFrame(filings, columns=FILING_COLUMNS)
+    sec = (
+        pd.concat(secs, ignore_index=True)
+        if secs
+        else pd.DataFrame(columns=sections.SECTION_COLUMNS)
+    )
+    return fil, sec
+
+
+def filings_frame(manifest: dict, root: Path = REPO_ROOT) -> pd.DataFrame:
+    """``fact_filings`` rows; fiscal-year label and period end come from the filing's dei."""
+    return _parse(manifest, root, with_sections=False)[0]
+
+
+def build(
+    manifest_path: Path = MANIFEST,
+    root: Path = REPO_ROOT,
+    db_path: Path = store.DB_PATH,
+    snapshot_dir: Path = snapshot.SNAPSHOT_DIR,
+    report_path: Path = REPORT,
+):
+    """manifest + raw -> sections -> financials -> ratios -> warehouse -> quality report ->
+    parquet snapshot. The warehouse file is rebuilt from scratch. Returns the connection."""
+    manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+    filings, secs = _parse(manifest, root, with_sections=True)
+    companies = {c.ticker: c for c in load_companies()}
+    tags = load_xbrl_tags()
+    as_of = date.fromisoformat(manifest["as_of"])
+    fins = []
+    for ticker, entry in manifest["companies"].items():
+        facts = json.loads((root / entry["company_facts"]).read_text(encoding="utf-8"))
+        fins.append(extract_annual(facts, tags, filings[filings["ticker"] == ticker], as_of))
+    fin = pd.concat(fins, ignore_index=True)
+    ratios = compute_ratios(fin)
+    dim = pd.DataFrame([companies[t].model_dump() for t in manifest["companies"]])
+    meta = pd.DataFrame(
+        [{"key": "as_of", "value": manifest["as_of"]},
+         {"key": "fetched_at", "value": manifest.get("fetched_at", "")}]
+    )  # fmt: skip
+
+    db_path = Path(db_path)
+    if str(db_path) != ":memory:" and db_path.exists():
+        db_path.unlink()
+    con = store.connect(db_path)
+    for table, df in [("dim_company", dim), ("fact_filings", filings), ("fact_sections", secs),
+                      ("fact_financials", fin), ("fact_ratios", ratios), ("meta", meta)]:  # fmt: skip
+        n = store.upsert(con, table, df)
+        print(f"{table}: {n} rows")
+    issues = quality.run_quality_checks(con)
+    quality.write_quality_report(issues, report_path, con)
+    errors = sum(i.severity == "error" for i in issues)
+    print(f"quality: {errors} error(s), {len(issues) - errors} warning(s) -> {report_path}")
+    size = snapshot.export_snapshot(con, snapshot_dir)
+    print(f"snapshot: {size / 1e6:.1f} MB -> {snapshot_dir}")
+    if size > snapshot.MAX_BYTES:
+        raise RuntimeError(f"snapshot {size / 1e6:.1f} MB exceeds the 60 MB budget")
+    return con
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="secanalyst.pipeline")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("ingest", help="download EDGAR raw data for all companies")
+    sub.add_parser("build", help="raw data -> warehouse, quality report and parquet snapshot")
     args = ap.parse_args(argv)
     if args.cmd == "ingest":
         ingest()
+    elif args.cmd == "build":
+        build()
 
 
 if __name__ == "__main__":
