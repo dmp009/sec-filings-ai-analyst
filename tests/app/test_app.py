@@ -4,7 +4,13 @@ import pytest
 from streamlit.testing.v1 import AppTest
 
 ROOT = Path(__file__).resolve().parents[2]
-PAGES = ["Home.py", "pages/3_Benchmarking.py", "pages/5_Data_quality.py", "pages/6_About.py"]
+PAGES = [
+    "Home.py",
+    "pages/1_Ask_the_filings.py",
+    "pages/3_Benchmarking.py",
+    "pages/5_Data_quality.py",
+    "pages/6_About.py",
+]
 DISCLAIMER = "Educational project — not investment advice. Source: SEC EDGAR."
 
 

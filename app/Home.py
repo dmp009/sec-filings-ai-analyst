@@ -43,13 +43,17 @@ with v1:
     )
     st.page_link("pages/3_Benchmarking.py", label="Open Benchmarking")
     st.markdown(
+        "**Ask the filings** — available now. Plain-English questions answered with quoted "
+        "passages and key sentences, each cited to filing, year and item."
+    )
+    st.page_link("pages/1_Ask_the_filings.py", label="Open Ask the filings")
+    st.markdown(
         "**Data quality** — available now. Checks run over the filings and financials, and "
         "what they found."
     )
     st.page_link("pages/5_Data_quality.py", label="Open Data quality")
 with v2:
     st.markdown("**Company explorer** — coming soon.")
-    st.markdown("**Ask the filings** — coming soon.")
     st.markdown("**Risk and change tracker** — coming soon.")
 st.markdown("See also: " + "About (what, how, limitations) in the sidebar.")
 

@@ -1,4 +1,5 @@
 """Typed loaders for the YAML files under config/. Paths resolve from REPO_ROOT, not cwd."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -25,6 +26,8 @@ class Settings(BaseModel):
     chunk_overlap: int = 60
     top_k: int = 8
     score_floor: float
+    lexical_floor: float = 0.55
+    out_of_scope_patterns: list[str] = []
     daily_llm_cap: int = 50
     user_agent_default: str
     disclaimer: str

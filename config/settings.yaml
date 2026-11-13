@@ -3,7 +3,20 @@ as_of: null            # frozen by the ingest run
 chunk_words: 320
 chunk_overlap: 60
 top_k: 8
-score_floor: 0.30      # provisional; Task 7 calibrates it on the retrieval eval set
+# Calibrated on data/eval/retrieval_eval.yaml with bge-small-en-v1.5: the best passage's cosine
+# is >= 0.62 for all 30 eval questions (0.66 unfiltered) and <= 0.55 for off-topic queries
+# (weather, sport, recipes). Market-data questions ("share price today") are semantically close
+# to real passages (cosine 0.72-0.74) so they are caught by out_of_scope_patterns instead.
+score_floor: 0.60
+# BM25-only fallback: share of query terms found in the best passage (>= 0.58 for 28/30 eval
+# questions filtered by company and year, <= 0.50 for off-topic queries)
+lexical_floor: 0.55
+out_of_scope_patterns:
+  - '\b(share|stock) (price|quote)'
+  - '\b(price|quote) (of|for) .{0,30}\b(share|stock)s?\b'
+  - '\btrading at\b'
+  - '\bprice target\b'
+  - '\b(should i|can i) (buy|sell)\b'
 daily_llm_cap: 50
 user_agent_default: "sec-filings-ai-analyst research project"
 disclaimer: "Educational project — not investment advice. Source: SEC EDGAR."

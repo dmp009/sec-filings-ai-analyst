@@ -57,3 +57,22 @@ def footer() -> None:
     st.divider()
     st.caption(get_settings().disclaimer)
     st.caption(f"Data as of {get_as_of()} (committed snapshot; no live data).")
+
+
+@st.cache_resource(show_spinner="Loading search index...")
+def get_index():
+    from secanalyst.retrieval.search import Index
+
+    return Index.load(ROOT / "data" / "snapshot")
+
+
+@st.cache_resource(show_spinner="Loading embedding model...")
+def get_embedder():
+    """The bge-small model, or None when it cannot load (offline first run): the Ask page then
+    falls back to keyword (BM25) search with a visible note."""
+    try:
+        from secanalyst.retrieval.embedding import FastEmbedder
+
+        return FastEmbedder()
+    except Exception:  # noqa: BLE001 - any load failure means "use the BM25 fallback"
+        return None

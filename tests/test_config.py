@@ -14,12 +14,32 @@ EXPECTED = {
 }
 
 CONCEPTS = [
-    "revenue", "cost_of_revenue", "gross_profit", "operating_income", "net_income",
-    "depreciation_amortization", "operating_cash_flow", "capex", "sbc", "total_assets",
-    "total_equity", "total_debt", "cash_short_term_investments", "receivables", "inventory",
-    "payables", "income_tax", "pretax_income", "short_term_borrowings", "commercial_paper",
-    "debt_current", "debt_noncurrent", "finance_lease_liability_current",
-    "finance_lease_liability_noncurrent", "cash_and_equivalents", "short_term_investments",
+    "revenue",
+    "cost_of_revenue",
+    "gross_profit",
+    "operating_income",
+    "net_income",
+    "depreciation_amortization",
+    "operating_cash_flow",
+    "capex",
+    "sbc",
+    "total_assets",
+    "total_equity",
+    "total_debt",
+    "cash_short_term_investments",
+    "receivables",
+    "inventory",
+    "payables",
+    "income_tax",
+    "pretax_income",
+    "short_term_borrowings",
+    "commercial_paper",
+    "debt_current",
+    "debt_noncurrent",
+    "finance_lease_liability_current",
+    "finance_lease_liability_noncurrent",
+    "cash_and_equivalents",
+    "short_term_investments",
     "marketable_securities_noncurrent",
 ]
 
@@ -34,8 +54,14 @@ def test_companies():
 def test_red_flag_categories():
     rf = config.load_red_flags()
     assert set(rf) == {
-        "customer_concentration", "litigation", "material_weakness", "going_concern",
-        "china_geopolitics", "ai_regulation", "export_controls", "cybersecurity",
+        "customer_concentration",
+        "litigation",
+        "material_weakness",
+        "going_concern",
+        "china_geopolitics",
+        "ai_regulation",
+        "export_controls",
+        "cybersecurity",
     }
     for v in rf.values():
         assert v["keywords"] and 2 <= len(v["seeds"]) <= 3
