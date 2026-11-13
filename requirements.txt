@@ -1,0 +1,18 @@
+# Runtime dependencies pinned to the versions the test suite passed with (Python 3.13).
+# Loose ranges live in pyproject.toml; this file is what Streamlit Community Cloud installs.
+anthropic==2.8.0
+beautifulsoup4==4.15.0
+duckdb==2.0.0
+fastembed==0.9.1
+lxml==6.1.3
+numpy==2.5.4
+pandas==3.1.1
+pandera==0.36.0
+plotly==7.1.0
+pydantic==2.14.3
+PyYAML==6.0.3
+rank-bm25==0.2.2
+reportlab==5.1.0
+requests==2.34.2
+streamlit==1.67.0
+.
