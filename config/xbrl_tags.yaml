@@ -29,8 +29,13 @@ debt_current: [LongTermDebtCurrent, DebtCurrent]
 debt_noncurrent: [LongTermDebtNoncurrent, LongTermDebtAndCapitalLeaseObligations, LongTermDebt]
 finance_lease_liability_current: [FinanceLeaseLiabilityCurrent]
 finance_lease_liability_noncurrent: [FinanceLeaseLiabilityNoncurrent]
+# Total finance-lease liability: added to debt only when neither split component is tagged (Microsoft)
+finance_lease_liability_total: [FinanceLeaseLiability]
 cash_and_equivalents: [CashAndCashEquivalentsAtCarryingValue]
 short_term_investments: [ShortTermInvestments, AvailableForSaleSecuritiesDebtSecuritiesCurrent, MarketableSecuritiesCurrent]
-marketable_securities_noncurrent: [MarketableSecuritiesNoncurrent, AvailableForSaleSecuritiesDebtSecuritiesNoncurrent, LongTermInvestments]
+# LongTermInvestments is deliberately excluded (Microsoft: mostly equity-method / non-marketable equity)
+marketable_securities_noncurrent: [MarketableSecuritiesNoncurrent, AvailableForSaleSecuritiesDebtSecuritiesNoncurrent]
 # Liquidity fallback only when neither short- nor long-term securities are tagged (NVIDIA FY2026)
 marketable_securities_total: [AvailableForSaleSecuritiesDebtSecurities]
+# Cash equivalents inside cash; subtracted from marketable_securities_total (AFS overlap)
+cash_equivalents: [CashEquivalentsAtCarryingValue]

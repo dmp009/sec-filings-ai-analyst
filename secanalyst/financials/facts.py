@@ -24,15 +24,28 @@ Derived concepts (§9.4), with the path recorded in ``tag``:
   current debt is ``DebtCurrent`` (which already includes short-term borrowings and commercial
   paper) those two are not added again; when the non-current debt is
   ``LongTermDebtAndCapitalLeaseObligations`` (finance leases included) the non-current finance
-  lease is not added again. The lumped ``total_debt`` tags are used only when no component is
-  reported for the year (tag ``fallback:<Tag>``).
+  lease is not added again. ``finance_lease_liability_total`` (``FinanceLeaseLiability``, the
+  only finance-lease tag Microsoft uses) is added only when neither split finance-lease
+  component is reported and the non-current debt is not ``LongTermDebtAndCapitalLeaseObligations``.
+  The lumped ``total_debt`` tags are used only when no component is reported for the year
+  (tag ``fallback:<Tag>``).
 - ``liquidity`` = cash and equivalents + short-term investments + long-term marketable
-  securities; a missing component counts as 0 when cash is present. When neither short- nor
-  long-term securities are tagged, ``marketable_securities_total`` (all available-for-sale debt
-  securities; NVIDIA FY2026) is added instead. Without cash, the lumped
+  securities. Ruling R6: a missing securities component counts as 0 when cash is present
+  (companies without that holding simply do not tag it). ``LongTermInvestments`` is *not* a
+  marketable-securities tag (Microsoft: mostly equity-method / non-marketable equity), so
+  Microsoft's long-term debt securities (~$15bn) are left out: liquidity is understated rather
+  than overstated. When neither short- nor long-term securities are tagged,
+  ``marketable_securities_total`` (all available-for-sale debt securities; NVIDIA FY2026) is
+  added instead, minus ``cash_equivalents`` (AFS debt securities include the cash equivalents
+  already in cash; floor 0; tag ``sum:Cash+(AFS-CashEquivalents)``). Without a cash-equivalents
+  value the overlap is unknown and the total is not added. Without cash, the lumped
   ``cash_short_term_investments`` tag is used (``fallback:<Tag>``), otherwise no row.
 - ``depreciation_amortization``: when no combined tag is reported, depreciation + amortization
-  of intangibles (missing amortization = 0; tag ``sum:Depreciation+...``).
+  of intangibles (tag ``sum:Depreciation+...``). Ruling R5: a depreciation-only year is withheld
+  (no row; debt_to_ebitda becomes n/a) when another extracted year of the same company reports
+  material amortization of intangibles (>= ``MATERIAL_AMORTIZATION`` of that year's D&A;
+  Broadcom FY2021–22). Immaterial amortization elsewhere (Tesla FY2021, ~2 %) keeps the
+  depreciation-only value, which may then exclude minor amortization (Alphabet, Tesla).
 """
 
 from __future__ import annotations
@@ -55,7 +68,7 @@ BALANCE_CONCEPTS = {
     "inventory", "payables", "short_term_borrowings", "commercial_paper", "debt_current",
     "debt_noncurrent", "finance_lease_liability_current", "finance_lease_liability_noncurrent",
     "cash_and_equivalents", "short_term_investments", "marketable_securities_noncurrent",
-    "marketable_securities_total",
+    "marketable_securities_total", "cash_equivalents", "finance_lease_liability_total",
 }  # fmt: skip
 DEBT_COMPONENTS = [
     "short_term_borrowings",
@@ -72,6 +85,7 @@ LIQUIDITY_COMPONENTS = [
 ]
 FLOW_DAYS = (350, 380)
 MATCH_DAYS = 7
+MATERIAL_AMORTIZATION = 0.10  # share of D&A above which amortization of intangibles matters
 N_YEARS = 5
 
 # (concept, value, tag, accession, filed)
@@ -156,7 +170,7 @@ def extract_annual(
     flow_ends = {
         d for (c, _), v in by_tag.items() if c not in BALANCE_CONCEPTS for d in v
     }  # annual duration ends are the fiscal year ends
-    rows = []
+    per_year: list[tuple[str, date, dict[str, _Hit]]] = []
     for label, pe in _years(filings, flow_ends, n_years):
         hits: dict[str, _Hit] = {}
         for concept, tag_list in tags.items():
@@ -165,7 +179,11 @@ def extract_annual(
                 if f is not None:
                     hits[concept] = (concept, float(f["val"]), tag, f["accn"], f.get("filed", ""))
                     break
-        _derive(hits)
+        per_year.append((label, pe, hits))
+    material_amort = {label for label, _, h in per_year if _material_amortization(h)}
+    rows = []
+    for label, pe, hits in per_year:
+        _derive(hits, amortization_elsewhere=bool(material_amort - {label}))
         for concept, value, tag, accn, _ in hits.values():
             rows.append((ticker, label, pe, concept, value, tag, accn))
     df = pd.DataFrame(rows, columns=FINANCIAL_COLUMNS)
@@ -188,7 +206,15 @@ def _sum(concept: str, parts: list[_Hit]) -> _Hit:
     )
 
 
-def _derive(h: dict[str, _Hit]) -> None:
+def _material_amortization(h: dict[str, _Hit]) -> bool:
+    amort = h.get("amortization_intangibles")
+    if amort is None or amort[1] <= 0:
+        return False
+    dep = h["depreciation"][1] if "depreciation" in h else 0.0
+    return amort[1] >= MATERIAL_AMORTIZATION * (dep + amort[1])
+
+
+def _derive(h: dict[str, _Hit], amortization_elsewhere: bool = False) -> None:
     """Add/replace the derived concepts in place (see module docstring)."""
     # non-current debt from a LongTermDebt total
     nc, cur = h.get("debt_noncurrent"), h.get("debt_current")
@@ -209,6 +235,13 @@ def _derive(h: dict[str, _Hit]) -> None:
     if h.get("debt_noncurrent", ("",) * 3)[2] == "LongTermDebtAndCapitalLeaseObligations":
         skip.add("finance_lease_liability_noncurrent")
     parts = [h[c] for c in DEBT_COMPONENTS if c in h and c not in skip]
+    split_leases = {"finance_lease_liability_current", "finance_lease_liability_noncurrent"}
+    if (
+        "finance_lease_liability_total" in h
+        and not split_leases & h.keys()
+        and "finance_lease_liability_noncurrent" not in skip
+    ):
+        parts.append(h["finance_lease_liability_total"])
     if parts:
         h["total_debt"] = _sum("total_debt", parts)
     elif "total_debt" in h:
@@ -217,10 +250,20 @@ def _derive(h: dict[str, _Hit]) -> None:
 
     # liquidity
     if "cash_and_equivalents" in h:
+        # R6: a missing securities component counts as 0 when cash is present
         parts = [h[c] for c in LIQUIDITY_COMPONENTS if c in h]
-        if len(parts) == 1 and "marketable_securities_total" in h:
-            parts.append(h["marketable_securities_total"])
-        h["liquidity"] = _sum("liquidity", parts)
+        afs, ce = h.get("marketable_securities_total"), h.get("cash_equivalents")
+        if len(parts) == 1 and afs and ce:
+            liq = _sum("liquidity", parts)
+            h["liquidity"] = (
+                "liquidity",
+                liq[1] + max(afs[1] - ce[1], 0.0),
+                f"{liq[2]}+({afs[2]}-{ce[2]})",
+                _accessions([*parts, afs, ce]),
+                max(liq[4], afs[4], ce[4]),
+            )
+        else:
+            h["liquidity"] = _sum("liquidity", parts)
     elif "cash_short_term_investments" in h:
         _, v, tag, accn, filed = h["cash_short_term_investments"]
         h["liquidity"] = ("liquidity", v, f"fallback:{tag}", accn, filed)
@@ -228,4 +271,5 @@ def _derive(h: dict[str, _Hit]) -> None:
     # D&A
     if "depreciation_amortization" not in h and "depreciation" in h:
         parts = [h[c] for c in ("depreciation", "amortization_intangibles") if c in h]
-        h["depreciation_amortization"] = _sum("depreciation_amortization", parts)
+        if len(parts) == 2 or not amortization_elsewhere:  # R5
+            h["depreciation_amortization"] = _sum("depreciation_amortization", parts)

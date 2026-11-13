@@ -45,6 +45,7 @@ FULL = {
     "operating_cash_flow": 30.0, "capex": 10.0, "income_tax": 50.0, "pretax_income": 100.0,
     "total_equity": 100.0, "total_debt": 50.0, "liquidity": 30.0, "receivables": 20.0,
     "inventory": 8.0, "payables": 12.0, "depreciation_amortization": 10.0,
+    "total_assets": 500.0,
 }  # fmt: skip
 
 
@@ -79,6 +80,29 @@ def test_negative_equity_is_not_meaningful():
         assert row.status == "n/m"
         assert pd.isna(row.value)
         assert "equity" in row.reason and "-5" in row.reason
+
+
+def test_roic_not_meaningful_when_invested_capital_is_small_vs_assets():
+    # equity 10 + debt 50 - liquidity 55 = 5 < 10 % of assets 100
+    r = compute_ratios(
+        fin({**FULL, "total_equity": 10.0, "liquidity": 55.0, "total_assets": 100.0})
+    )
+    row = ratio(r, "roic")
+    assert row.status == "n/m" and pd.isna(row.value)
+    assert row.reason == (
+        "invested capital $0.0bn < 10% of total assets ($0.0bn); ROIC dominated by cash netting"
+    )
+    assert ratio(r, "roe").status == "ok"
+
+
+def test_roic_needs_total_assets():
+    r = compute_ratios(fin({k: v for k, v in FULL.items() if k != "total_assets"}))
+    assert ratio(r, "roic").reason == "missing concept total_assets"
+
+
+def test_debt_to_ebitda_na_without_d_and_a():
+    r = compute_ratios(fin({k: v for k, v in FULL.items() if k != "depreciation_amortization"}))
+    assert ratio(r, "debt_to_ebitda").reason == "missing concept depreciation_amortization"
 
 
 def test_non_positive_invested_capital_is_not_meaningful():
@@ -185,12 +209,14 @@ TAGS = {
     "debt_noncurrent": ["LongTermDebtNoncurrent", "LongTermDebt"],
     "finance_lease_liability_current": ["FinanceLeaseLiabilityCurrent"],
     "finance_lease_liability_noncurrent": ["FinanceLeaseLiabilityNoncurrent"],
+    "finance_lease_liability_total": ["FinanceLeaseLiability"],
     "total_debt": ["DebtLongtermAndShorttermCombinedAmount"],
     "cash_and_equivalents": ["CashAndCashEquivalentsAtCarryingValue"],
     "short_term_investments": ["MarketableSecuritiesCurrent"],
     "marketable_securities_noncurrent": ["MarketableSecuritiesNoncurrent"],
     "cash_short_term_investments": ["CashCashEquivalentsAndShortTermInvestments"],
     "marketable_securities_total": ["AvailableForSaleSecuritiesDebtSecurities"],
+    "cash_equivalents": ["CashEquivalentsAtCarryingValue"],
     "depreciation_amortization": ["DepreciationDepletionAndAmortization"],
     "depreciation": ["Depreciation"],
     "amortization_intangibles": ["AmortizationOfIntangibleAssets"],
@@ -305,18 +331,81 @@ def test_liquidity_uses_total_securities_only_when_no_split_is_tagged():
             _fact(40, "2025-12-31"),
             _fact(35, "2024-12-31"),
         ],
+        "CashEquivalentsAtCarryingValue": [_fact(8, "2025-12-31")],
         "MarketableSecuritiesCurrent": [_fact(30, "2024-12-31")],
         "Revenues": [_year(2025, 1), _year(2024, 1)],
     }
     df = extract_annual(_facts(gaap), TAGS, _filings(years=(2025,)))
-    assert value(df, "liquidity", "2025").value == 50
+    # AFS debt securities include the cash equivalents already in cash: 10 + (40 - 8)
+    liq = value(df, "liquidity", "2025")
+    assert liq.value == 42
+    assert liq.tag == (
+        "sum:CashAndCashEquivalentsAtCarryingValue+"
+        "(AvailableForSaleSecuritiesDebtSecurities-CashEquivalentsAtCarryingValue)"
+    )
     assert value(df, "liquidity", "2024").value == 39  # split tagged: total not added
+
+
+def test_total_securities_overlap_floors_at_zero_and_needs_cash_equivalents():
+    gaap = {
+        "CashAndCashEquivalentsAtCarryingValue": [_fact(10, "2025-12-31"), _fact(9, "2024-12-31")],
+        "AvailableForSaleSecuritiesDebtSecurities": [
+            _fact(5, "2025-12-31"),
+            _fact(35, "2024-12-31"),
+        ],
+        "CashEquivalentsAtCarryingValue": [_fact(8, "2025-12-31")],
+        "Revenues": [_year(2025, 1), _year(2024, 1)],
+    }
+    df = extract_annual(_facts(gaap), TAGS, _filings(years=(2025,)))
+    assert value(df, "liquidity", "2025").value == 10  # max(5 - 8, 0) = 0
+    # no cash-equivalents tag -> overlap unknown -> total securities not added
+    assert value(df, "liquidity", "2024").value == 9
 
 
 def test_liquidity_absent_without_cash():
     gaap = {"MarketableSecuritiesCurrent": [_fact(20, "2025-12-31")]}
     df = extract_annual(_facts(gaap), TAGS, _filings(years=(2025,)))
     assert df[df.concept == "liquidity"].empty
+
+
+def test_finance_lease_total_is_debt_only_without_split_components():
+    gaap = {
+        "LongTermDebtNoncurrent": [_fact(40, "2025-12-31"), _fact(30, "2024-12-31")],
+        "FinanceLeaseLiability": [_fact(60, "2025-12-31"), _fact(20, "2024-12-31")],
+        "FinanceLeaseLiabilityCurrent": [_fact(2, "2024-12-31")],
+        "Revenues": [_year(2025, 1), _year(2024, 1)],
+    }
+    df = extract_annual(_facts(gaap), TAGS, _filings(years=(2025,)))
+    d25 = value(df, "total_debt", "2025")
+    assert d25.value == 100 and "FinanceLeaseLiability" in d25.tag
+    d24 = value(df, "total_debt", "2024")  # split component tagged: total not added
+    assert d24.value == 32 and d24.tag.endswith("FinanceLeaseLiabilityCurrent")
+
+
+def test_finance_lease_total_not_added_to_debt_that_includes_leases():
+    tags = {**TAGS, "debt_noncurrent": ["LongTermDebtAndCapitalLeaseObligations"]}
+    gaap = {
+        "LongTermDebtAndCapitalLeaseObligations": [_fact(50, "2025-12-31")],
+        "FinanceLeaseLiability": [_fact(4, "2025-12-31")],
+    }
+    df = extract_annual(_facts(gaap), tags, _filings(years=(2025,)))
+    assert value(df, "total_debt", "2025").value == 50
+
+
+def test_depreciation_only_d_and_a_withheld_when_amortization_is_material_elsewhere():
+    # FY2024 reports material amortization; FY2025 only depreciation -> no D&A for FY2025
+    gaap = {
+        "Depreciation": [_year(2025, 5), _year(2024, 5)],
+        "AmortizationOfIntangibleAssets": [_year(2024, 30)],
+    }
+    df = extract_annual(_facts(gaap), TAGS, _filings(years=(2025,)))
+    assert df[(df.concept == "depreciation_amortization") & (df.fiscal_year_label == "2025")].empty
+    assert value(df, "depreciation_amortization", "2024").value == 35
+    # immaterial amortization elsewhere (< 10 % of D&A) keeps the depreciation-only value
+    gaap["AmortizationOfIntangibleAssets"] = [_year(2024, 0.1)]
+    df = extract_annual(_facts(gaap), TAGS, _filings(years=(2025,)))
+    d25 = value(df, "depreciation_amortization", "2025")
+    assert (d25.value, d25.tag) == (5, "sum:Depreciation")
 
 
 def test_d_and_a_falls_back_to_depreciation_plus_amortization():
@@ -379,6 +468,14 @@ def test_real_company_facts(capsys):
     nv = rev[rev.ticker == "NVDA"].sort_values("period_end").iloc[-1]
     assert nv.fiscal_year_label == "2026"
     assert (nv.period_end.year, nv.period_end.month) == (2026, 1)
+
+    # back-test of the AFS-minus-cash-equivalents liquidity path (used for NVDA FY2026) on
+    # FY2025, where NVIDIA still tags current marketable securities separately
+    n25 = df[(df.ticker == "NVDA") & (df.fiscal_year_label == "2025")].set_index("concept").value
+    afs_path = (
+        n25["cash_and_equivalents"] + n25["marketable_securities_total"] - n25["cash_equivalents"]
+    )
+    assert afs_path == pytest.approx(n25["liquidity"], rel=0.01)
 
     assert set(ratios.status) <= {"ok", "n/a", "n/m"}
     bad = ratios[ratios.status != "ok"]

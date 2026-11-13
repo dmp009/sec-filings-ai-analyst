@@ -14,9 +14,14 @@ Definitions (year-end balances, 365-day year):
 - NOPAT = operating income x (1 - effective tax rate), rate = income tax / pretax income
   clamped to [0, 35 %] (0 when pretax income <= 0)
 - invested capital = equity + total debt - liquidity; roic = NOPAT / invested capital,
-  roe = net income / equity; n/m when equity <= 0 or invested capital <= 0
+  roe = net income / equity; n/m when equity <= 0 or invested capital <= 0. Ruling R4 (extends
+  §9.4): roic is also n/m when invested capital < 10 % of total assets — ROIC is then dominated
+  by netting cash against debt and equity (Apple FY2022–24)
 - net_cash = liquidity - total debt (USD)
-- debt_to_ebitda = total debt / (operating income + D&A); n/m when EBITDA <= 0
+- debt_to_ebitda = total debt / (operating income + D&A); n/m when EBITDA <= 0. D&A for
+  Alphabet, Tesla (depreciation only) and Microsoft (depreciation + intangibles amortization)
+  may exclude minor amortization items; a depreciation-only year is withheld (n/a) when the
+  company reports material intangibles amortization in other years (Broadcom FY2021–22)
 - dso = receivables / revenue x 365; dio = inventory / cost of revenue x 365;
   dpo = payables / cost of revenue x 365; ccc = dso + dio - dpo
   (cost of revenue = ``cost_of_revenue`` tag, else revenue - gross profit)
@@ -43,6 +48,7 @@ RATIOS = [
     "dso", "dio", "dpo", "ccc",
 ]  # fmt: skip
 TAX_RATE_CAP = 0.35
+MIN_IC_TO_ASSETS = 0.10  # R4
 DAYS = 365
 
 
@@ -154,6 +160,12 @@ def _fcf_conversion(y: _Year) -> float:
 
 def _roic(y: _Year) -> float:
     ic = y.invested_capital()  # n/m checks (equity, invested capital) before NOPAT inputs
+    assets = y.get("total_assets")
+    if ic < MIN_IC_TO_ASSETS * assets:
+        raise _NotMeaningful(
+            f"invested capital ${ic / 1e9:.1f}bn < 10% of total assets (${assets / 1e9:.1f}bn); "
+            "ROIC dominated by cash netting"
+        )
     return y.nopat() / ic
 
 

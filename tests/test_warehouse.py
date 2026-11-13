@@ -101,6 +101,21 @@ def test_quality_flags_fiscal_label_mismatch_and_bad_ratio_rows():
     assert "ratio_schema" in checks
 
 
+def test_quality_warns_when_debt_omits_reported_finance_leases():
+    con = connect(":memory:")
+    upsert(con, "dim_company", _company())
+    rows = [
+        ("total_debt", 40.0, "sum:LongTermDebtNoncurrent"),
+        ("finance_lease_liability_total", 60.0, "FinanceLeaseLiability"),
+    ]
+    upsert(con, "fact_financials", pd.DataFrame(
+        [{"ticker": "AAPL", "fiscal_year_label": "2026", "period_end": date(2026, 9, 26),
+          "concept": c, "value": v, "tag": t, "accession": "a"} for c, v, t in rows]
+    ))  # fmt: skip
+    hits = [i for i in run_quality_checks(con) if i.check == "debt_without_finance_leases"]
+    assert len(hits) == 1 and hits[0].severity == "warning" and "FY2026" in hits[0].detail
+
+
 def test_quality_report_lists_issues(tmp_path):
     con = _con(items=("1", "7"))
     issues = run_quality_checks(con)

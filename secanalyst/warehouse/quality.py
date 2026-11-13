@@ -60,6 +60,11 @@ CHECKS = (
         ),
     ),
     ("financials_schema", "error", "fact_financials row with empty tag or accession"),
+    (
+        "debt_without_finance_leases",
+        "warning",
+        "total debt has no finance-lease component although FinanceLeaseLiability is reported",
+    ),
 )
 KEY_RATIOS = [
     ("revenue_growth", "Rev. growth", "pct"),
@@ -188,6 +193,24 @@ def _financial_checks(con: duckdb.DuckDBPyConnection) -> list[QualityIssue]:
                         "warning",
                     )
                 )
+    debt = fin[fin["concept"] == "total_debt"].set_index(["ticker", "fiscal_year_label"])
+    leases = fin[fin["concept"] == "finance_lease_liability_total"]
+    for r in leases.itertuples():
+        key = (r.ticker, r.fiscal_year_label)
+        if (
+            key in debt.index
+            and "FinanceLease" not in debt.loc[key, "tag"]
+            and ("LongTermDebtAndCapitalLeaseObligations" not in debt.loc[key, "tag"])
+        ):
+            issues.append(
+                QualityIssue(
+                    "debt_without_finance_leases",
+                    r.ticker,
+                    f"FY{r.fiscal_year_label}: total debt {debt.loc[key, 'tag']} omits "
+                    f"FinanceLeaseLiability ({r.value / 1e9:,.1f} $bn)",
+                    "warning",
+                )
+            )
     bad = fin[(fin["tag"].fillna("") == "") | (fin["accession"].fillna("") == "")]
     for r in bad.itertuples():
         issues.append(
