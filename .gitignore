@@ -1,0 +1,9 @@
+.venv/
+data/raw/
+data/*.duckdb
+.env
+.superpowers/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/

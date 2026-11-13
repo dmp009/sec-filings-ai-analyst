@@ -1,0 +1,48 @@
+customer_concentration:
+  keywords: ["one customer accounted for", "customers accounted for", "significant portion of our revenue", "concentration of customers", "largest customers"]
+  seeds:
+    - "One customer accounted for more than 10% of our total revenue during the fiscal year."
+    - "A small number of customers represent a significant portion of our revenue and receivables."
+    - "The loss of any of our largest customers could materially harm our business."
+litigation:
+  keywords: ["legal proceedings", "class action", "lawsuit", "antitrust", "patent infringement", "investigation by"]
+  seeds:
+    - "We are subject to legal proceedings, including class action lawsuits and government investigations."
+    - "An adverse outcome in antitrust or patent infringement litigation could require us to pay significant damages."
+    - "Regulators have opened investigations into our business practices."
+material_weakness:
+  keywords: ["material weakness", "ineffective internal control", "internal control over financial reporting was not effective", "restatement", "significant deficiency"]
+  seeds:
+    - "We identified a material weakness in our internal control over financial reporting."
+    - "Management concluded that internal control over financial reporting was not effective."
+    - "We may be required to restate our financial statements."
+going_concern:
+  keywords: ["going concern", "substantial doubt", "ability to continue as a going concern", "insufficient liquidity", "covenant default"]
+  seeds:
+    - "There is substantial doubt about our ability to continue as a going concern."
+    - "If we cannot raise additional capital, we may not have sufficient liquidity to fund operations."
+    - "A default under our debt covenants could accelerate repayment of our indebtedness."
+china_geopolitics:
+  keywords: ["china", "taiwan", "geopolitical", "tariffs", "trade tensions", "mainland china"]
+  seeds:
+    - "Our operations and supply chain in China and Taiwan expose us to geopolitical and trade tensions."
+    - "Tariffs and retaliatory trade measures between the United States and China could harm our results."
+    - "Military conflict or political instability in Taiwan could disrupt our manufacturing partners."
+ai_regulation:
+  keywords: ["artificial intelligence regulation", "AI Act", "regulation of artificial intelligence", "AI regulation", "responsible AI", "algorithmic"]
+  seeds:
+    - "New laws and regulations governing artificial intelligence, such as the EU AI Act, could increase our compliance costs."
+    - "Evolving regulation of AI technologies may restrict how we develop and deploy our products."
+    - "Concerns about bias, safety or misuse of AI could result in regulatory scrutiny and reputational harm."
+export_controls:
+  keywords: ["export control", "export restrictions", "export administration regulations", "license requirement", "entity list", "sanctions"]
+  seeds:
+    - "U.S. export controls restrict our ability to sell advanced products to customers in certain countries."
+    - "New license requirements could prevent us from shipping products to China and other markets."
+    - "Our customers or suppliers may be added to the Entity List, disrupting our sales."
+cybersecurity:
+  keywords: ["cybersecurity", "cyber attack", "data breach", "ransomware", "unauthorized access", "security incident"]
+  seeds:
+    - "We have experienced and may continue to experience cyber attacks and security incidents."
+    - "A data breach could expose confidential customer information and result in liability and reputational damage."
+    - "Ransomware and other malicious attacks could disrupt our operations and systems."

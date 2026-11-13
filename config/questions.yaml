@@ -1,0 +1,31 @@
+questions:
+- id: q01
+  ticker: AAPL
+  question: What does Apple say about its dependence on outsourcing partners in Asia?
+- id: q02
+  ticker: MSFT
+  question: How does Microsoft describe competition in cloud services?
+- id: q03
+  ticker: NVDA
+  question: What export control risks does NVIDIA disclose for its data center products?
+- id: q04
+  ticker: NVDA
+  question: Which customers account for a significant share of NVIDIA revenue?
+- id: q05
+  ticker: AMZN
+  question: What risks does Amazon describe around fulfillment network capacity?
+- id: q06
+  ticker: GOOGL
+  question: What antitrust matters does Alphabet describe in its legal proceedings?
+- id: q07
+  ticker: META
+  question: How does Meta describe regulatory risks in the European Union?
+- id: q08
+  ticker: AVGO
+  question: How concentrated is Broadcom's revenue among its largest customers?
+- id: q09
+  ticker: TSLA
+  question: What does Tesla disclose about supply chain and battery cell dependence?
+- id: q10
+  ticker: null
+  question: Which companies mention artificial intelligence regulation as a risk?
