@@ -1,9 +1,10 @@
+PYTHON ?= python3.13
 PY ?= .venv/bin/python
 
 .PHONY: install test lint pipeline app readme
 
 install:
-	python3.13 -m venv .venv
+	$(PYTHON) -m venv .venv
 	$(PY) -m pip install -e ".[dev]"
 
 test:

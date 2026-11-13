@@ -17,7 +17,10 @@ CONCEPTS = [
     "revenue", "cost_of_revenue", "gross_profit", "operating_income", "net_income",
     "depreciation_amortization", "operating_cash_flow", "capex", "sbc", "total_assets",
     "total_equity", "total_debt", "cash_short_term_investments", "receivables", "inventory",
-    "payables", "income_tax", "pretax_income",
+    "payables", "income_tax", "pretax_income", "short_term_borrowings", "commercial_paper",
+    "debt_current", "debt_noncurrent", "finance_lease_liability_current",
+    "finance_lease_liability_noncurrent", "cash_and_equivalents", "short_term_investments",
+    "marketable_securities_noncurrent",
 ]
 
 
@@ -49,6 +52,7 @@ def test_settings():
     s = config.load_settings()
     assert s.disclaimer == "Educational project — not investment advice. Source: SEC EDGAR."
     assert s.user_agent_default == "sec-filings-ai-analyst research project"
+    assert s.llm_model == "claude-sonnet-5-5"
     assert "@" not in s.user_agent_default
     assert (s.chunk_words, s.chunk_overlap, s.top_k, s.daily_llm_cap) == (320, 60, 8, 50)
     assert 0 < s.score_floor < 1

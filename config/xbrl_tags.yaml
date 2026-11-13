@@ -9,6 +9,8 @@ capex: [PaymentsToAcquirePropertyPlantAndEquipment, PaymentsToAcquireProductiveA
 sbc: [ShareBasedCompensation, AllocatedShareBasedCompensationExpense]
 total_assets: [Assets]
 total_equity: [StockholdersEquity, StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest]
+# total_debt and cash_short_term_investments are documented FALLBACKS only; design 9.4 builds
+# them from the component concepts below.
 total_debt: [DebtLongtermAndShorttermCombinedAmount, LongTermDebt, DebtAndCapitalLeaseObligations, LongTermDebtAndCapitalLeaseObligations]
 cash_short_term_investments: [CashCashEquivalentsAndShortTermInvestments, CashAndCashEquivalentsAtCarryingValue]
 receivables: [AccountsReceivableNetCurrent, ReceivablesNetCurrent]
@@ -16,3 +18,13 @@ inventory: [InventoryNet]
 payables: [AccountsPayableCurrent, AccountsPayableAndAccruedLiabilitiesCurrent]
 income_tax: [IncomeTaxExpenseBenefit]
 pretax_income: [IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest, IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments]
+# Components for design 9.4 (total debt, liquidity)
+short_term_borrowings: [ShortTermBorrowings]
+commercial_paper: [CommercialPaper]
+debt_current: [LongTermDebtCurrent, DebtCurrent]
+debt_noncurrent: [LongTermDebtNoncurrent, LongTermDebt]
+finance_lease_liability_current: [FinanceLeaseLiabilityCurrent]
+finance_lease_liability_noncurrent: [FinanceLeaseLiabilityNoncurrent]
+cash_and_equivalents: [CashAndCashEquivalentsAtCarryingValue]
+short_term_investments: [ShortTermInvestments, AvailableForSaleSecuritiesDebtSecuritiesCurrent, MarketableSecuritiesCurrent]
+marketable_securities_noncurrent: [MarketableSecuritiesNoncurrent, AvailableForSaleSecuritiesDebtSecuritiesNoncurrent, LongTermInvestments]
