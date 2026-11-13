@@ -51,7 +51,7 @@ if len(bad):
 st.plotly_chart(ratio_lines(df, ratio), width="stretch")
 
 st.subheader("Latest fiscal year ranking")
-ranked, median, label = latest_ranking(df)
+ranked, median, label = latest_ranking(df, ratio)
 if median is None:
     st.warning("No valid value for this ratio in the latest fiscal year.")
 else:
@@ -60,15 +60,23 @@ st.plotly_chart(ranking_bar(ranked, ratio, median), width="stretch")
 if len(ranked):
     shown = ranked.assign(value_fmt=[fmt_value(ratio, v) for v in ranked["value"]])
     st.dataframe(
-        shown[["ticker", "fiscal_year_label", "value_fmt"]].rename(
-            columns={"ticker": "Company", "fiscal_year_label": "Fiscal year", "value_fmt": choice}
+        shown[["rank", "ticker", "fiscal_year_label", "value_fmt"]].rename(
+            columns={
+                "rank": "Rank",
+                "ticker": "Company",
+                "fiscal_year_label": "Fiscal year",
+                "value_fmt": choice,
+            }
         ),
         width="stretch",
         hide_index=True,
     )
 st.caption(
     "Each company is taken at its latest reported fiscal year; the median and ranking use "
-    "valid values only (n/a and n/m are excluded)."
+    "valid values only (n/a and n/m are excluded). Rank 1 = best: "
+    + ("highest" if RATIO_INFO[ratio].higher_is_better else "lowest")
+    + " value is better for this ratio."
+    + (" Mixed fiscal years." if ranked["fiscal_year_label"].nunique() > 1 else "")
 )
 
 st.subheader("Source of a value")

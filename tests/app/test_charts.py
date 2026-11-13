@@ -53,3 +53,11 @@ def test_charts_are_pure_figures():
     ranked, median, _ = latest_ranking(_df())
     assert isinstance(ranking_bar(ranked, "roe", median), go.Figure)
     assert isinstance(ranking_bar(ranked.iloc[0:0], "roe", None), go.Figure)
+
+
+def test_ranking_direction_lower_is_better():
+    df = _df().assign(ratio="dso")
+    ranked, _, _ = latest_ranking(df, "dso")
+    assert list(ranked["ticker"]) == ["A", "B"] and list(ranked["rank"]) == [1, 2]
+    ranked, _, _ = latest_ranking(_df(), "roe")
+    assert list(ranked["ticker"]) == ["B", "A"]

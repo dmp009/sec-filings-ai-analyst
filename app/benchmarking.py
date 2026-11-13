@@ -13,6 +13,7 @@ class RatioInfo:
     label: str
     unit: str  # pct | x | days | usd
     definition: str
+    higher_is_better: bool = True
 
 
 RATIO_INFO: dict[str, RatioInfo] = {
@@ -35,7 +36,9 @@ RATIO_INFO: dict[str, RatioInfo] = {
     "fcf_conversion": RatioInfo(
         "FCF conversion", "pct", "Free cash flow / net income. n/m when net income <= 0."
     ),
-    "capex_intensity": RatioInfo("Capex intensity", "pct", "Capex / revenue."),
+    "capex_intensity": RatioInfo(
+        "Capex intensity", "pct", "Capex / revenue.", higher_is_better=False
+    ),
     "roic": RatioInfo(
         "ROIC",
         "pct",
@@ -56,17 +59,26 @@ RATIO_INFO: dict[str, RatioInfo] = {
         "x",
         "Total debt / (operating income + depreciation and amortization). n/m when EBITDA <= 0. "
         "D&A may omit minor amortization items for Alphabet, Tesla and Microsoft.",
+        higher_is_better=False,
     ),
     "dso": RatioInfo(
-        "Receivable days (DSO)", "days", "Receivables / revenue x 365, year-end balances."
+        "Receivable days (DSO)",
+        "days",
+        "Receivables / revenue x 365, year-end balances.",
+        higher_is_better=False,
     ),
     "dio": RatioInfo(
-        "Inventory days (DIO)", "days", "Inventory / cost of revenue x 365, year-end balances."
+        "Inventory days (DIO)",
+        "days",
+        "Inventory / cost of revenue x 365, year-end balances.",
+        higher_is_better=False,
     ),
     "dpo": RatioInfo(
-        "Payable days (DPO)", "days", "Payables / cost of revenue x 365, year-end balances."
+        "Payable days (DPO)",
+        "days",
+        "Payables / cost of revenue x 365, year-end balances.",
     ),
-    "ccc": RatioInfo("Cash conversion cycle", "days", "DSO + DIO - DPO."),
+    "ccc": RatioInfo("Cash conversion cycle", "days", "DSO + DIO - DPO.", higher_is_better=False),
 }
 
 FY_NOTE = (
@@ -100,8 +112,10 @@ def axis_title(ratio: str) -> str:
     return {"pct": "%", "x": "x", "days": "days", "usd": "$bn"}[RATIO_INFO[ratio].unit]
 
 
-def latest_ranking(df: pd.DataFrame) -> tuple[pd.DataFrame, float | None, str]:
-    """Each company's latest fiscal year of one ratio, ranked high to low.
+def latest_ranking(
+    df: pd.DataFrame, ratio: str | None = None
+) -> tuple[pd.DataFrame, float | None, str]:
+    """Each company's latest fiscal year of one ratio, ranked best first (direction per ratio).
 
     Only status ``ok`` rows are ranked and enter the peer median; n/a and n/m never do.
     Returns (ranked rows, median or None, latest fiscal-year label overall).
@@ -109,6 +123,10 @@ def latest_ranking(df: pd.DataFrame) -> tuple[pd.DataFrame, float | None, str]:
     latest = df.sort_values("period_end").groupby("ticker").tail(1)
     label = str(df["fiscal_year_label"].max())
     ok = latest[latest["status"] == "ok"].dropna(subset=["value"])
-    ranked = ok.sort_values("value", ascending=False).reset_index(drop=True)
+    ranked = ok.sort_values(
+        "value", ascending=not RATIO_INFO[ratio or df["ratio"].iloc[0]].higher_is_better
+    )
+    ranked = ranked.reset_index(drop=True)
+    ranked.insert(0, "rank", range(1, len(ranked) + 1))
     median = float(ranked["value"].median()) if len(ranked) else None
     return ranked, median, label
