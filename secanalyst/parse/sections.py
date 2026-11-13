@@ -9,7 +9,17 @@ Text rules (design §6.2):
   tables) is dropped. Any other table is kept as text, one line per row, cells joined by a
   space (bullet lists, headings and the table of contents are often laid out as tables).
 - Whitespace (incl. non-breaking spaces) is collapsed inside a line; blank lines and page
-  artifacts (a line that is only a page number or "Table of Contents") are dropped.
+  artifacts (a line that is only a page number, "Table of Contents", or a running header naming
+  several items such as "Item 1B, 1C") are dropped.
+- Running page headers/footers: page breaks (``<hr>`` or ``page-break-*`` styles) are marked.
+  A short line (< ``RUNNING_MAX_LEN`` chars) that, after digit normalisation, sits within
+  ``RUNNING_WINDOW`` lines of a page break at least ``RUNNING_MIN_REPEAT`` times and next to
+  at least ``RUNNING_MIN_SHARE`` of the page breaks is a running
+  header/footer ("Apple Inc. | 2026 Form 10-K | 19", "PART I" / "Item 1A",
+  "Table of Contents Alphabet Inc.") and is removed wherever it sits next to a page break.
+  Repeated subheadings inside the body ("Overview", "Automotive") are kept. A paragraph split
+  by a page break is re-joined when the first part does not end in sentence punctuation and
+  the second starts in lower case. A lone bullet line is joined to the line it marks.
 
 Item detection: a heading is a line starting with "Item <n><letter>" (any case, followed by
 '.', ':', '-', an em/en dash, a space or nothing; split tags and table cells are joined first).
@@ -22,7 +32,8 @@ Unresolved Staff Comments - None."). A start still followed by a cluster of TOC 
 (a TOC row with sub-entries) is moved past it. A section runs from its heading to the next
 item heading. A missing item is absent from the result, never an empty string; an item
 found out of canonical order is treated as missing.
-Known limit: a body paragraph that itself starts with "Item 7 ..." would read as a heading.
+A heading line is at most ``HEADING_MAX_LEN`` chars, so a body paragraph starting with
+"Item 7 of this report ..." is not taken as a heading (a *short* such line still would be).
 """
 
 from __future__ import annotations
@@ -62,6 +73,20 @@ SECTION_COLUMNS = [
     "text",
     "n_chars",
 ]
+HEADING_MAX_LEN = 200  # longer lines starting with "Item N" are body text, not headings
+RUNNING_MAX_LEN = 80
+RUNNING_WINDOW = 3  # content lines on each side of a page break inspected for headers/footers
+RUNNING_MIN_REPEAT = 3
+RUNNING_MIN_SHARE = 0.10  # ... and next to at least 10 % of the page breaks
+_PAGE = "\x00"  # page-break marker inside the raw text (removed before returning)
+_BULLET = re.compile(r"^[•●◦▪■o\-–]$")
+# running header naming several items ("Item 1B, 1C", "PART II, III Item 9B, 9C, 10"): never
+# a real heading
+_MULTI_ITEM = re.compile(
+    r"^(part [ivx]+(, ?[ivx]+)* )?item \d+[a-c]?(, ?\d+[a-c]?)+$", re.IGNORECASE
+)
+_SHORT_ANSWER = re.compile(r"^(none|not applicable)\.?$")  # whole content of a short item
+_SENTENCE_END = re.compile(r"[.!?:;”\")]$")
 TOC_GAP = 250  # chars between consecutive headings below which a heading is a TOC entry
 NUMERIC_TABLE_SHARE = 0.4  # share of numeric cells above which a table is dropped
 
@@ -71,7 +96,8 @@ _BLOCK = {
 }  # fmt: skip
 _SKIP = {"script", "style", "head", "title", "ix:header", "noscript"}
 _HIDDEN = re.compile(r"display\s*:\s*none", re.IGNORECASE)
-_NUMERIC_CELL = re.compile(r"^[\s$€£%()\-—–.,*0-9]*\d[\s$€£%()\-—–.,*0-9]*$")
+# numbers, or dash/blank placeholders for zero ("—") in financial tables
+_NUMERIC_CELL = re.compile(r"^[\s$€£%()\-—–.,*0-9]*[\d—–-][\s$€£%()\-—–.,*0-9]*$")
 # a line that is only a page number or the "Table of Contents" back-link
 _PAGE_ARTIFACT = re.compile(r"^(\d{1,3}\.?|table of contents)$", re.IGNORECASE)
 _WS = re.compile(r"[ \t\r\f\v\u00a0\u2002\u2003\u2009\u200b]+")
@@ -134,6 +160,9 @@ def _walk(el, out: list[str], inline: bool = False) -> None:
         if lines:
             out.append("\n" + "\n".join(lines) + "\n")
         return
+    style = (el.get("style") or "").replace(" ", "").lower()
+    if not inline and "page-break-before:always" in style:
+        out.append(f"\n{_PAGE}\n")
     block = tag in _BLOCK
     if block:
         out.append(sep)
@@ -146,6 +175,8 @@ def _walk(el, out: list[str], inline: bool = False) -> None:
             out.append(child.tail)
     if block:
         out.append(sep)
+    if not inline and (tag == "hr" or "page-break-after:always" in style):
+        out.append(f"\n{_PAGE}\n")
 
 
 def _clean_line(s: str) -> str:
@@ -159,32 +190,80 @@ def _decode(data: bytes) -> str:
         return data.decode("cp1252", errors="replace")
 
 
-def _parse(html: str | bytes):
+def parse_html(html: str | bytes):
+    """Parse once; the returned root can be passed to html_to_text, fiscal_year_label and
+    period_end instead of the raw HTML."""
+    if not isinstance(html, (str, bytes)):
+        return html  # already parsed
     text = _decode(html) if isinstance(html, bytes) else html
     # lxml refuses str input that carries an XML encoding declaration
     return lxml.html.fromstring(re.sub(r"^\s*<\?xml[^>]*\?>", "", text))
 
 
-def html_to_text(html: str | bytes) -> str:
-    """Visible text of a filing, one paragraph / table row per line."""
+def _norm(line: str) -> str:
+    return re.sub(r"\d+", "#", line.lower())
+
+
+def _strip_running(lines: list[str]) -> list[str]:
+    """Drop running headers/footers next to page breaks; re-join split paragraphs."""
+    near: list[int] = []  # indexes of content lines within RUNNING_WINDOW of a page break
+    for i, line in enumerate(lines):
+        if line != _PAGE:
+            continue
+        for step in (-1, 1):
+            j, seen = i + step, 0
+            while 0 <= j < len(lines) and lines[j] != _PAGE and seen < RUNNING_WINDOW:
+                near.append(j)
+                j, seen = j + step, seen + 1
+    near_set = set(near)
+    counts: dict[str, int] = {}
+    for j in near_set:
+        if len(lines[j]) < RUNNING_MAX_LEN:
+            counts[_norm(lines[j])] = counts.get(_norm(lines[j]), 0) + 1
+    n_breaks = lines.count(_PAGE)
+    min_repeat = max(RUNNING_MIN_REPEAT, RUNNING_MIN_SHARE * n_breaks)
+    running = {k for k, n in counts.items() if n >= min_repeat and not _SHORT_ANSWER.match(k)}
+    kept = [
+        x for j, x in enumerate(lines)
+        if not (j in near_set and len(x) < RUNNING_MAX_LEN and _norm(x) in running)
+    ]  # fmt: skip
+    out: list[str] = []
+    joinable = False  # a page break was crossed since the last content line
+    for x in kept:
+        if x == _PAGE:
+            joinable = True
+            continue
+        split_paragraph = joinable and not _SENTENCE_END.search(out[-1] if out else ".")
+        if out and ((split_paragraph and x[:1].islower()) or _BULLET.match(out[-1])):
+            out[-1] = f"{out[-1]} {x}"
+        else:
+            out.append(x)
+        joinable = False
+    return out
+
+
+def html_to_text(html) -> str:
+    """Visible text of a filing, one paragraph / table row per line. ``html`` may be the raw
+    HTML (str/bytes) or a root returned by :func:`parse_html`."""
     parts: list[str] = []
-    _walk(_parse(html), parts)
-    lines = (_clean_line(x) for x in "".join(parts).split("\n"))
-    return "\n".join(x for x in lines if x and not _PAGE_ARTIFACT.match(x))
+    _walk(parse_html(html), parts)
+    lines = (_clean_line(x) if x != _PAGE else x for x in "".join(parts).split("\n"))
+    lines = [x for x in lines if x and not (_PAGE_ARTIFACT.match(x) or _MULTI_ITEM.match(x))]
+    return "\n".join(_strip_running(lines))
 
 
 # ---------------------------------------------------------------- cover data (dei)
 
 
-def _dei(html: str | bytes, name: str) -> str | None:
-    root = _parse(html)
+def _dei(html, name: str) -> str | None:
+    root = parse_html(html)
     for el in root.iter("ix:nonnumeric"):
         if (el.get("name") or "").lower() == name.lower():
             return _clean_line(el.text_content())
     return None
 
 
-def fiscal_year_label(html: str | bytes) -> str:
+def fiscal_year_label(html) -> str:
     """dei:DocumentFiscalYearFocus of the filing (the company's own label), e.g. '2026'."""
     val = _dei(html, "dei:DocumentFiscalYearFocus")
     if not val or not re.fullmatch(r"\d{4}", val):
@@ -195,7 +274,7 @@ def fiscal_year_label(html: str | bytes) -> str:
 _DATE_FORMATS = ("%B %d, %Y", "%b %d, %Y", "%Y-%m-%d", "%m/%d/%Y", "%d %B %Y", "%B %d %Y")
 
 
-def period_end(html: str | bytes) -> date:
+def period_end(html) -> date:
     """dei:DocumentPeriodEndDate of the filing."""
     val = _dei(html, "dei:DocumentPeriodEndDate")
     if val:
@@ -206,6 +285,16 @@ def period_end(html: str | bytes) -> date:
             except ValueError:
                 continue
     raise ValueError(f"no usable dei:DocumentPeriodEndDate ({val!r})")
+
+
+def expected_fiscal_year(period_end: date, fy_end_month: int) -> int:
+    """Fiscal year (named after the calendar year in which it ends) that contains
+    ``period_end``. A 52/53-week year may end up to a week into the next month (Broadcom:
+    FY2024 ended 3 Nov 2024 with fy_end_month 10), which still counts as the fiscal year end."""
+    m, y = period_end.month, period_end.year
+    if period_end.day <= 7 and m == fy_end_month % 12 + 1:
+        m, y = fy_end_month, y - (fy_end_month == 12)
+    return y if m <= fy_end_month else y + 1
 
 
 # ---------------------------------------------------------------- items
@@ -235,7 +324,7 @@ def _headings(text: str, form: str) -> list[_Head]:
             part = _ROMAN.get(p) or int(p)
             im = _ITEM_HEAD.match(pm.group(2)) if pm.group(2) else None  # "PART I — Item 2."
         else:
-            im = _ITEM_HEAD.match(line)
+            im = _ITEM_HEAD.match(line) if len(line) <= HEADING_MAX_LEN else None
         if im:
             item = im.group(1) + (im.group(2) or "").upper()
             title = im.group(3).strip() or (lines[i + 1] if i + 1 < len(lines) else "")

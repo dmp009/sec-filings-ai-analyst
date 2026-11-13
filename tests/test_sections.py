@@ -1,18 +1,22 @@
 """Parsing and sectioning: HTML -> text -> Items (design §6.2, §9.2, §9.5)."""
 
 import json
+import re
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
 import pytest
 
-from secanalyst.config import REPO_ROOT
+from secanalyst.config import REPO_ROOT, load_companies
 from secanalyst.ingest.edgar import FilingRef
 from secanalyst.parse.sections import (
     ITEMS_10K,
     SECTION_COLUMNS,
+    expected_fiscal_year,
     fiscal_year_label,
     html_to_text,
+    parse_html,
     period_end,
     section_rows,
     split_items,
@@ -209,6 +213,99 @@ def test_running_page_headers_do_not_hide_the_body_heading():
     assert items["8"].count("This paragraph") == 6
 
 
+def test_long_paragraph_starting_with_item_is_not_a_heading():
+    para = "Item 7 of this report discusses results in detail; " + FILLER
+    html = doc(["Item 1. Business", "Item 7. MD&amp;A"], extra_body=f"<div>{para}</div>")
+    html = html.replace("<div><span>Item 7. MD", f"<div>{para}</div><div><span>Item 7. MD")
+    items = split_items(html_to_text(html), "10-K")
+    assert items["7"].startswith("Item 7. MD&A")
+    assert items["1"].count("Item 7 of this report") == 1  # stays in Item 1's body
+
+
+# ---------------------------------------------------------------- running headers / footers
+
+
+def paged_doc() -> str:
+    """Three pages: running header (PART I / Item 1A) and footer (company | form | page), a
+    paragraph split across the first page break, a repeated subheading and a short answer."""
+    head = "<div>PART I</div><div>Item 1A</div>"
+    pages = [
+        (
+            f"<div>Item 1A. Risk Factors</div><div>{FILLER}</div><div>Overview</div>"
+            f"<div>{FILLER}</div><div>Our suppliers may fail to deliver components</div>"
+        ),
+        f"<div>on time, which would hurt sales.</div><div>{FILLER}</div><div>Overview</div>",
+        (
+            f"<div>{FILLER}</div><div>Overview</div>"
+            "<div>Item 1B. Unresolved Staff Comments</div><div>None.</div>"
+            f"<div>Item 1C. Cybersecurity</div><div>None.</div><div>Item 2. Properties</div>"
+            f"<div>None.</div><div>{FILLER}</div>"
+        ),
+    ]
+    body = '<div>Acme Corp. annual report cover</div><hr style="page-break-after:always"/>'
+    body += "".join(
+        head
+        + page
+        + f"<div>Acme Corp. | 2026 Form 10-K | {i + 7}</div>"
+        + '<hr style="page-break-after:always"/>'
+        for i, page in enumerate(pages)
+    )
+    return f"<html><body>{body}</body></html>"
+
+
+def test_running_headers_and_footers_are_removed():
+    text = html_to_text(paged_doc())
+    assert "Form 10-K" not in text  # footer gone (the cover line stays)
+    assert "PART I" not in text.split("\n") and "Item 1A" not in text.split("\n")
+    assert text.split("\n")[1] == "Item 1A. Risk Factors"  # the real heading survives
+    assert text.count("Overview") == 3  # repeated body subheading kept
+    assert text.count("None.") == 3  # short answers kept
+
+
+def test_paragraph_split_by_page_break_is_rejoined():
+    text = html_to_text(paged_doc())
+    assert "Our suppliers may fail to deliver components on time, which would hurt sales." in text
+    items = split_items(text, "10-K")
+    assert items["1B"] == "Item 1B. Unresolved Staff Comments\nNone."
+
+
+def test_lone_bullet_line_is_joined_to_its_text():
+    html = "<html><body><div>•</div><div>Competition is intense.</div></body></html>"
+    assert html_to_text(html) == "• Competition is intense."
+
+
+def test_dash_placeholders_count_as_numeric_cells():
+    equity = (
+        "<table><tr><td>Net income</td><td>—</td><td>—</td><td>—</td><td>72,880</td></tr>"
+        "<tr><td>Dividends</td><td>—</td><td>—</td><td>(1,234)</td><td>—</td></tr></table>"
+    )
+    assert html_to_text(f"<html><body><p>A.</p>{equity}</body></html>") == "A."
+
+
+def test_parse_once_and_reuse_the_root():
+    html = fixture("aapl_10k_2026_trim.htm")
+    root = parse_html(html)
+    assert html_to_text(root) == html_to_text(html)
+    assert fiscal_year_label(root) == "2026" and period_end(root) == date(2026, 9, 26)
+
+
+@pytest.mark.parametrize(
+    "pe, fy_end_month, expected",
+    [
+        (date(2026, 1, 25), 1, 2026),  # NVDA 10-K: FY2026 ends Jan 2026
+        (date(2026, 7, 26), 1, 2027),  # NVDA 10-Q: inside FY2027
+        (date(2026, 9, 30), 6, 2027),  # MSFT 10-Q
+        (date(2026, 6, 30), 6, 2026),  # MSFT 10-K
+        (date(2024, 11, 3), 10, 2024),  # AVGO 52/53-week year ending early November
+        (date(2026, 8, 2), 10, 2026),  # AVGO 10-Q
+        (date(2025, 12, 31), 12, 2025),
+        (date(2026, 1, 2), 12, 2025),  # 52/53-week December year ending in early January
+    ],
+)
+def test_expected_fiscal_year(pe, fy_end_month, expected):
+    assert expected_fiscal_year(pe, fy_end_month) == expected
+
+
 # ---------------------------------------------------------------- fact_sections rows
 
 
@@ -241,21 +338,45 @@ def _real_filings():
     return [f for c in m["companies"].values() for f in c["filings"]]
 
 
+_HEADER_SHAPE = re.compile(
+    r"form #+-[kq]|table of contents|^part [ivx]+$|^item #+[a-c]?$|^page #+$", re.IGNORECASE
+)
+
+
+def _repeated_short_lines(section: str) -> list[str]:
+    """Short lines (< 80 chars) occurring >= 3 times, compared after digit normalisation."""
+    norm = Counter(re.sub(r"\d+", "#", x.lower()) for x in section.split("\n") if len(x) < 80)
+    return [x for x, n in norm.items() if n >= 3]
+
+
 @pytest.mark.realdata
 @pytest.mark.skipif(not MANIFEST.exists(), reason="data/raw not downloaded")
 def test_every_downloaded_filing_sections_cleanly(capsys):
+    fy_end = {c.ticker: c.fy_end_month for c in load_companies()}
+    names = {c.ticker: re.sub(r"\W", "", c.name.split()[0].lower()) for c in load_companies()}
     failures, table = [], []
     for f in _real_filings():
-        html = (REPO_ROOT / f["path"]).read_bytes()
-        text = html_to_text(html)
+        root = parse_html((REPO_ROOT / f["path"]).read_bytes())  # parsed once
+        text = html_to_text(root)
         items = split_items(text, f["form"])
-        label, pe = fiscal_year_label(html), period_end(html)
+        label, pe = fiscal_year_label(root), period_end(root)
         name = f"{f['ticker']} {f['form']} {f['accession']}"
         table.append((name, label, pe, len(text), {k: len(v) for k, v in items.items()}))
         if pe.isoformat() != f["period_end"]:
             failures.append(f"{name}: period_end {pe} != manifest {f['period_end']}")
-        if not abs(int(label) - pe.year) <= 1:
-            failures.append(f"{name}: label {label} inconsistent with period end {pe}")
+        # exact fiscal-year rule: the label is the fiscal year containing the period end, named
+        # after the calendar year in which it ends; for a 10-K that is the period-end year
+        expected = expected_fiscal_year(pe, fy_end[f["ticker"]])
+        if int(label) != expected or (f["form"] == "10-K" and int(label) != pe.year):
+            failures.append(f"{name}: label {label} != expected FY{expected} for {pe}")
+        for key in ("1A", "7", "P1-2", "P2-1A"):
+            reps = _repeated_short_lines(items.get(key, ""))
+            if key in ("1A", "P2-1A"):
+                bad = reps  # risk factors: no short line may repeat at all
+            else:  # MD&A legitimately repeats segment subheadings; no header/footer shapes
+                bad = [x for x in reps if _HEADER_SHAPE.search(x) or names[f["ticker"]] in x]
+            if bad:
+                failures.append(f"{name}: running header/footer lines in {key}: {bad}")
         if any(not v.strip() for v in items.values()) or len(set(items.values())) < len(items):
             failures.append(f"{name}: empty or duplicated section")
         if any(len(v) > 0.6 * len(text) for v in items.values()):
