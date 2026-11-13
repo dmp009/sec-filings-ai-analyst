@@ -139,7 +139,7 @@ def test_snapshot_roundtrip(tmp_path):
 
 @pytest.mark.skipif(not (SNAPSHOT_DIR / "meta.parquet").exists(), reason="no snapshot yet")
 def test_committed_snapshot_is_within_size_budget():
-    total = sum(p.stat().st_size for p in SNAPSHOT_DIR.glob("*.parquet"))
+    total = sum(p.stat().st_size for p in SNAPSHOT_DIR.iterdir() if p.is_file())
     assert total <= 60 * 1024 * 1024, f"snapshot is {total / 1e6:.1f} MB"
     con = load_snapshot()
     assert con.execute("SELECT value FROM meta WHERE key = 'as_of'").fetchone()[0]

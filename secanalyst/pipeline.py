@@ -134,16 +134,66 @@ def build(
     return con
 
 
+def index(snapshot_dir: Path = snapshot.SNAPSHOT_DIR, embedder=None) -> int:
+    """fact_sections (+ period ends) in the snapshot -> chunks.parquet + vectors.npy (float16).
+    Downloads the embedding model on first use. Returns the index size in bytes."""
+    from secanalyst.retrieval.embedding import FastEmbedder
+    from secanalyst.retrieval.search import build_index
+
+    snapshot_dir = Path(snapshot_dir)
+    secs = pd.read_parquet(snapshot_dir / "fact_sections.parquet")
+    fil = pd.read_parquet(snapshot_dir / "fact_filings.parquet")[["filing_id", "period_end"]]
+    secs = secs.merge(fil, on="filing_id", how="left")
+    secs["period_end"] = secs["period_end"].astype(str)
+    st = load_settings()
+    idx = build_index(secs, embedder or FastEmbedder(), st.chunk_words, st.chunk_overlap)
+    idx.save(snapshot_dir)
+    size = sum((snapshot_dir / f).stat().st_size for f in ("chunks.parquet", "vectors.npy"))
+    print(f"index: {len(idx.chunks)} chunks, {size / 1e6:.1f} MB -> {snapshot_dir}")
+    return size
+
+
+EVAL_FILTERS = ("ticker", "fy")  # what a user sets in the Ask page: company and year
+EVAL_PATH = REPO_ROOT / "data" / "eval" / "retrieval_eval.yaml"
+
+
+def run_eval(snapshot_dir: Path = snapshot.SNAPSHOT_DIR, embedder=None) -> dict:
+    import yaml
+
+    from secanalyst.retrieval.embedding import FastEmbedder
+    from secanalyst.retrieval.search import Index, evaluate
+
+    embedder = embedder or FastEmbedder()
+    qs = yaml.safe_load(EVAL_PATH.read_text(encoding="utf-8"))["questions"]
+    idx = Index.load(snapshot_dir)
+    res = evaluate(idx, qs, embedder, EVAL_FILTERS)
+    for p in res["per_question"]:
+        print(f"  {p['id']}: rank={p['rank']} top_relevance={p['top_relevance']:.3f}")
+    print(f"filters {EVAL_FILTERS}: recall@5 = {res['recall_at_5']:.3f}  MRR = {res['mrr']:.3f}"
+          f"  (n={len(qs)})")  # fmt: skip
+    for keys in [(), ("ticker",)]:
+        r = evaluate(idx, qs, embedder, keys)
+        print(f"filters {keys}: recall@5 = {r['recall_at_5']:.3f}  MRR = {r['mrr']:.3f}")
+    return res
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="secanalyst.pipeline")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("ingest", help="download EDGAR raw data for all companies")
     sub.add_parser("build", help="raw data -> warehouse, quality report and parquet snapshot")
+    sub.add_parser("index", help="chunk + embed sections into chunks.parquet and vectors.npy")
+    sub.add_parser("eval", help="recall@5 and MRR on data/eval/retrieval_eval.yaml")
     args = ap.parse_args(argv)
     if args.cmd == "ingest":
         ingest()
     elif args.cmd == "build":
         build()
+        index()
+    elif args.cmd == "index":
+        index()
+    elif args.cmd == "eval":
+        run_eval()
 
 
 if __name__ == "__main__":
