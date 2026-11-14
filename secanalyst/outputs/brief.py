@@ -44,7 +44,6 @@ METRICS = [
     ("debt_to_ebitda", "Debt / EBITDA", "x"),
 ]
 MAX_RISKS = 5
-LINE_CHARS = 210
 
 
 @dataclass
@@ -65,11 +64,6 @@ def _fmt(value, unit: str) -> str:
     if value is None or pd.isna(value):
         return "n/a"
     return f"{value * 100:.1f}%" if unit == "pct" else f"{value:.2f}x"
-
-
-def _clip(text: str, n: int = LINE_CHARS) -> str:
-    text = " ".join(text.split())
-    return text if len(text) <= n else text[: n - 3].rsplit(" ", 1)[0] + "..."
 
 
 def _metrics(con, ticker: str) -> tuple[str, list[tuple[str, str, str]]]:
@@ -111,31 +105,56 @@ def _clean_sentence(s: str) -> str:
         n += 1
     if n >= 2:
         s = " ".join(words[n:])
-    return _RISKS_HEADING.sub("", s.strip(), count=1)
+    s = _RISKS_HEADING.sub("", s.strip(), count=1)
+    m = _CONNECTOR.match(s)
+    if m:
+        s = s[m.end() :]
+        s = s[:1].upper() + s[1:]
+    return s
+
+
+_CONNECTOR = re.compile(r"^(Finally|Additionally|Moreover|Furthermore|In addition),\s+")
+_LIT_TERM = re.compile(
+    r"(?i)lawsuits?|litigation|legal proceedings?|class actions?|legal claims|claims and legal"
+)
+_END_OK = re.compile(r"[.!?][\"”’)]?$")
+MAX_LINE = 220
 
 
 def _title_ok(t: str) -> bool:
-    return len(t.split()) >= 5 and not _BAD_TITLE.search(t.strip())
+    t = t.strip()
+    return len(t.split()) >= 5 and not _BAD_TITLE.search(t) and bool(_END_OK.search(t))
+
+
+def _fit(titles) -> list[str]:
+    """Complete, acceptable titles; those that fit one line first (never clipped)."""
+    ok = [t for t in titles if _title_ok(t)]
+    return [t for t in ok if len(t) <= MAX_LINE] + [t for t in ok if len(t) > MAX_LINE]
 
 
 def _best_sentence(rows: list, pat: re.Pattern, category: str = "") -> tuple[str, str]:
     """(sentence, item) of the first complete sentence of 8-40 words that has a keyword;
     the sentence is empty when none qualifies."""
-    for r in rows:
-        for raw in _SPLIT.split(r["text"]):
-            s = _clean_sentence(raw)
-            words = s.split()
-            caps = sum(w.isupper() and len(w) > 1 for w in words)
-            if not (s[:1].isupper() and re.search(r"[.!?][\"”’)]?$", s)):
-                continue
-            if (
-                category == "customer_concentration"
-                and re.search(r"(?i)distributors?", s)
-                and not _ONE_CUSTOMER.search(s)
-            ):
-                continue
-            if pat.search(s) and 8 <= len(words) <= 40 and caps / len(words) <= 0.6:
-                return s, r["item"]
+    for limit in (MAX_LINE, None):  # prefer a sentence that fits one line; never clip it
+        for r in rows:
+            for raw in _SPLIT.split(r["text"]):
+                s = _clean_sentence(raw)
+                words = s.split()
+                if not words or (limit and len(s) > limit):
+                    continue
+                caps = sum(w.isupper() and len(w) > 1 for w in words)
+                if not (s[:1].isupper() and _END_OK.search(s)):
+                    continue
+                if category == "litigation" and not _LIT_TERM.search(s):
+                    continue
+                if (
+                    category == "customer_concentration"
+                    and re.search(r"(?i)distributors?", s)
+                    and not _ONE_CUSTOMER.search(s)
+                ):
+                    continue
+                if pat.search(s) and 8 <= len(words) <= 40 and caps / len(words) <= 0.6:
+                    return s, r["item"]
     return "", rows[0]["item"]  # no clean sentence: the caller omits the risk line
 
 
@@ -174,16 +193,15 @@ def brief_content(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_D
             ticker, diff["fy_prev"].iloc[0], period.get(diff["fy_prev"].iloc[0], "")
         )
         c.removed_titles = [
-            (_clip(t, 150), prev_cite)
-            for t in diff[diff["status"] == "removed"]["prev_title"].head(2)
+            (t.strip(), prev_cite)
+            for t in _fit(diff[diff["status"] == "removed"]["prev_title"])[:2]
         ]
         # risks: new ones first, then the most heavily reworded
         pool = list(new["curr_title"]) + list(
             diff[diff["status"] == "changed"].sort_values("similarity")["curr_title"]
         )
-        pool = [t for t in pool if _title_ok(t)]
-        for t in pool[:3]:
-            c.risks.append((_clip(t), cite))
+        for t in _fit(pool)[:3]:
+            c.risks.append((t.strip(), cite))
     else:
         c.changes = "Fewer than two 10-Ks with a risk-factor section: no comparison."
 
@@ -201,14 +219,14 @@ def brief_content(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_D
             cit = filing_citation(ticker, "10-K", r.fy, it, period.get(r.fy, ""))
             c.red_flags.append((CATEGORY_LABELS[r.category], int(r.hits), cit))
             if sent and len(c.risks) < MAX_RISKS:
-                c.risks.append((f"{CATEGORY_LABELS[r.category]}: {_clip(sent, 170)}", cit))
+                c.risks.append((f"{CATEGORY_LABELS[r.category]}: {sent}", cit))
     conc = [r for r in customer_concentration_detail(chunks) if r[0] == ticker]
     if conc:
         latest = max(r[1] for r in conc)  # filing fiscal year, not the XBRL label
-        for _, _, _, cit, sent in [r for r in conc if r[1] == latest][:3]:
-            c.concentration.append(
-                (f"Customer concentration (FY{latest}): " + _clip(sent, 190), cit)
-            )
+        rows = [r for r in conc if r[1] == latest and _END_OK.search(r[4].strip())]
+        rows = [r for r in rows if len(r[4]) <= MAX_LINE] + [r for r in rows if len(r[4]) > MAX_LINE]
+        for _, _, _, cit, sent in rows[:3]:
+            c.concentration.append((f"Customer concentration (FY{latest}): " + sent.strip(), cit))
     c.risks = c.risks[:MAX_RISKS]
     return c
 

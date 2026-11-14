@@ -16,7 +16,7 @@ NO_MATCH = (
     "the text of 10-K and 10-Q filings, not market data such as share prices."
 )
 _SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z“\"(])")
-MIN_WORDS = 7
+MIN_WORDS = 8
 _PART = {"P1": "Part I", "P2": "Part II"}
 
 
@@ -92,7 +92,17 @@ def _strip_heading(s: str) -> str:
     return s.strip()
 
 
+_ALLEGING = re.compile(r"^(?:[A-Z][\w.&'-]*\s+){1,3}(?:finding|alleging|stating|concluding) that\b")
+
+
+_CAPS_RUN = re.compile(r"(?:\b[A-Z]{2,}\b\s+){3,}")
+
+
 def _valid(s: str) -> bool:
+    if _CAPS_RUN.search(s + " "):
+        return False  # embedded heading or report title
+    if _ALLEGING.match(s):
+        return False
     first = next((ch for ch in s if ch.isalpha()), "")
     if not first or first.islower() or "\u2022" in s or len(s.split()) > MAX_WORDS:
         return False

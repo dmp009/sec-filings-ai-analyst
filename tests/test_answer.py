@@ -118,7 +118,7 @@ def test_split_drops_fragments_and_headings():
     good = "The company depends heavily on outsourcing partners for most of its production volume."
     assert split_sentences("THE COMPANY AND ITS RISKS " + good) == [good]
     assert split_sentences(good) == [good]
-    long = "Overview and Basis of Presentation Overview Broadcom Inc. is a global technology leader."
+    long = "Overview and Basis of Presentation Overview Broadcom Inc. is a global technology leader in semiconductors."
     out = split_sentences(long)
     assert out and out[0].startswith("Broadcom Inc. is")
 
@@ -159,3 +159,13 @@ def test_key_sentences_near_duplicate_across_years_keeps_latest():
     hn = Hit("N-10-K-2026-7-0000", 0.8, "NVDA", "10-K", "2026", "7", new, "2026-01-25")
     out = [s.text for s in key_sentences("direct customers", [ho, hn], None)]
     assert out == [new]
+
+
+def test_split_drops_short_and_alleging_fragments():
+    assert split_sentences("Google finding that Google violated the law in several markets.") == []
+    assert split_sentences("Sales rose in all regions.") == []
+
+
+def test_split_drops_embedded_caps_headings():
+    t = "San Jose, California February 4, 2026 REPORT OF INDEPENDENT REGISTERED PUBLIC ACCOUNTING FIRM To the Stockholders of Alphabet Inc."
+    assert split_sentences(t) == []

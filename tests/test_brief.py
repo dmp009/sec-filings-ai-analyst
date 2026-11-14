@@ -58,7 +58,7 @@ def test_unknown_ticker_raises(data):
 
 from secanalyst.outputs.brief import _best_sentence, _fmt, _title_ok
 
-_KW = re.compile(r"(?i)export control|cyber|customer|litigation|legal")
+_KW = re.compile(r"(?i)export control|lawsuit|cyber|customer|litigation|legal")
 
 
 def _best(text, pat=_KW, category=""):
@@ -94,3 +94,21 @@ def test_risk_title_filter():
 
 def test_debt_ebitda_two_decimals():
     assert _fmt(1.234, "x") == "1.23x"
+
+
+def test_no_clipped_or_unfinished_risk_lines(data):
+    con, index = data
+    for t in ["AAPL", "NVDA", "AVGO", "MSFT", "AMZN", "META", "GOOGL", "TSLA"]:
+        c = brief_content(t, con, index)
+        lines = [x for x, _ in c.risks + c.concentration] + [x for x, _ in c.removed_titles]
+        for line in lines:
+            assert not line.endswith("..."), line
+            assert re.search(r"[.!?][\"”’)]?$", line), line
+        assert len(PdfReader(io.BytesIO(brief_pdf(t, con, index))).pages) == 1
+
+
+def test_litigation_needs_litigation_term_and_connector_stripped():
+    priv = "Risks and penalties could include ongoing audit requirements and data protection authority investigations."
+    assert _best(priv, category="litigation") == ""
+    lit = "Finally, we are subject to class action lawsuits that could harm our business results."
+    assert _best(lit, category="litigation").startswith("We are subject")
