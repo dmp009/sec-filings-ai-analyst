@@ -108,3 +108,11 @@ def get_customer_concentration():
 
     rows = customer_concentration(get_chunks())
     return pd.DataFrame(rows, columns=["ticker", "fy", "percent", "citation"])
+
+
+@st.cache_resource(show_spinner=False)
+def get_index_chunks():
+    """An Index over the passages only (no vectors), enough for the PDF brief."""
+    from secanalyst.retrieval.search import Index
+
+    return Index.load(ROOT / "data" / "snapshot", with_vectors=False)

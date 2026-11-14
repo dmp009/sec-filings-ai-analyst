@@ -58,6 +58,11 @@ with v2:
         "between its latest two 10-Ks, a red-flag radar and customer concentration."
     )
     st.page_link("pages/2_Due_diligence.py", label="Open Due diligence")
+    st.markdown(
+        "**Client brief** — available now. A one-page PDF per company: metrics against the "
+        "peer median, top risks with citations, what changed and red flags."
+    )
+    st.page_link("pages/4_Client_brief.py", label="Open Client brief")
     st.markdown("**Company explorer** — coming soon.")
 st.markdown("See also: " + "About (what, how, limitations) in the sidebar.")
 

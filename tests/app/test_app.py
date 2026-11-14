@@ -9,6 +9,7 @@ PAGES = [
     "pages/1_Ask_the_filings.py",
     "pages/2_Due_diligence.py",
     "pages/3_Benchmarking.py",
+    "pages/4_Client_brief.py",
     "pages/5_Data_quality.py",
     "pages/6_About.py",
 ]
@@ -53,3 +54,12 @@ def test_due_diligence_shows_diff_and_radar():
     at.selectbox(key="dd_radar_company").select("NVDA").run()
     at.selectbox(key="dd_cat").select("Export controls").run()
     assert not at.exception, [e.value for e in at.exception]
+
+
+def test_client_brief_download_button():
+    at = _run("pages/4_Client_brief.py")
+    assert not at.exception, [e.value for e in at.exception]
+    at.selectbox(key="brief_company").select("NVDA").run()
+    assert not at.exception, [e.value for e in at.exception]
+    btns = at.get("download_button")
+    assert btns and "PDF" in btns[0].proto.label
