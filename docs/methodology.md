@@ -80,8 +80,8 @@ Rulings, decided once and applied to every company:
 
 1. **Leases.** Operating leases are excluded from debt. Finance leases are included: from
    `FinanceLeaseLiabilityCurrent` and `...Noncurrent`, or from the total `FinanceLeaseLiability`
-   when neither part is tagged (Microsoft). Broadcom's `LongTermDebtAndCapitalLeaseObligations`
-   already includes its non-current finance leases, so they are not added twice. The check
+   when neither part is tagged (Microsoft). Broadcom's (and Alphabet's for FY2021-22) `LongTermDebtAndCapitalLeaseObligations`
+   already includes the non-current finance leases, so they are not added twice. The check
    `debt_without_finance_leases` flags a company whose debt has no lease part although one is
    reported.
 2. **Liquidity** is cash, short-term investments and marketable securities. `LongTermInvestments` is
@@ -112,8 +112,9 @@ plus one removed.
 
 ## 6. Red-flag radar
 
-Six keyword categories (`config/red_flags.yaml`): AI regulation, China, customer concentration,
-cybersecurity, export controls, litigation. A hit is a 10-K passage of at least 300 characters in
+Eight categories (material weakness and going concern have no hits in these filings), defined in
+`config/red_flags.yaml`: AI regulation, China, customer concentration, cybersecurity, export
+controls, litigation, material weakness, going concern. A hit is a 10-K passage of at least 300 characters in
 the category's items with a keyword in a core sentence; enumerations (four or more commas,
 semicolons or bullets) count only if they name the topic twice; Item 3 "see Note X" pointers are
 dropped. Cybersecurity is restricted to Item 1A (Item 1C governance text matched wrongly).
@@ -145,7 +146,8 @@ concentration 6/7, cybersecurity 6/7, export controls 5/6, litigation 5/6. Recal
   citation is among the retrieved chunks and (c) every number in the answer appears in a cited
   passage with the same value, scale (thousand, million, billion), percent flag and sign
   (a negative figure needs a negative figure in the source). One retry, then nothing is shown.
-  Only verified answers are cached.
+  Only verified answers are cached. Numbers written out in words ("two billion") are not
+  checked, only digits.
 - **Cost control.** A daily cap on calls (`daily_llm_cap`, 50) is kept in a local counter. It is
   best effort: on Streamlit Community Cloud the file system is ephemeral and the counter resets on
   restart. If you deploy with a key, set a monthly spend limit in the Anthropic console, which is

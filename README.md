@@ -180,6 +180,10 @@ make readme figures   # refresh the results block and the figures
 
 For drafted answers, set `ANTHROPIC_API_KEY` and run `python -m secanalyst.pipeline ai`.
 
+Deployment: Streamlit Cloud: choose Python 3.13; entry app/Home.py; the embedding model (~70 MB)
+downloads on first start. The package supports Python 3.11+ (CI runs 3.11); the deployed app and
+the pinned `requirements.txt` use 3.13.
+
 ## Structure
 
 ```
