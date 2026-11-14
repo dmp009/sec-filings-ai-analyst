@@ -12,13 +12,22 @@ from app.common import footer, get_settings, setup
 from secanalyst.answer import llm
 from secanalyst.answer.extractive import answer, citation
 from secanalyst.config import load_questions
+from secanalyst.retrieval.search import search
 
 setup("Ask the filings")
 st.title("Ask the filings")
-st.caption(
+_intro = (
     "Search the text of the 10-K and 10-Q filings. Answers are passages and sentences quoted "
-    "from the filings, each with its source; nothing is written by an AI."
+    "from the filings, each with its source. Key sentences and passages are quoted verbatim "
+    "from the filings."
 )
+try:
+    _has_key = bool(llm.get_api_key())
+except Exception:  # noqa: BLE001
+    _has_key = False
+if _has_key:
+    _intro += " An optional AI-drafted answer is shown when it passes verification."
+st.caption(_intro)
 
 index = common.get_index()
 embedder = common.get_embedder()
@@ -66,7 +75,11 @@ if query.strip():
         score_floor=settings.score_floor, lexical_floor=settings.lexical_floor,
         out_of_scope_patterns=settings.out_of_scope_patterns,
     )  # fmt: skip
-    if res.message:
+    if res.message and not res.hits and filters and not search(
+        index, query, filters, k=1, embedder=embedder
+    ):
+        st.warning("No passages match these filters.")
+    elif res.message:
         st.warning(res.message)
     else:
         draft = None

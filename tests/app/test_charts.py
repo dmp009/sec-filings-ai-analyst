@@ -37,7 +37,7 @@ def test_ranking_all_invalid_gives_none_median():
 
 def test_fmt_value_units():
     assert fmt_value("roe", 0.1234) == "12.3%"
-    assert fmt_value("debt_to_ebitda", 1.5) == "1.5x"
+    assert fmt_value("debt_to_ebitda", 1.5) == "1.50x"
     assert fmt_value("dso", 30.4) == "30 days"
     assert fmt_value("net_cash", 12.5e9) == "$12.5bn"
     assert fmt_value("roe", None, "n/m") == "n/m"

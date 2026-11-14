@@ -96,7 +96,7 @@ def fmt_value(ratio: str, value: float | None, status: str = "ok") -> str:
     if unit == "pct":
         return f"{value * 100:.1f}%"
     if unit == "x":
-        return f"{value:.1f}x"
+        return f"{value:.2f}x"
     if unit == "days":
         return f"{value:.0f} days"
     return f"${value / 1e9:.1f}bn"

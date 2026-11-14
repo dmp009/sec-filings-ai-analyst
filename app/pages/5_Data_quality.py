@@ -16,6 +16,6 @@ if report.exists():
     st.markdown(report.read_text(encoding="utf-8"))
 else:
     st.info(
-        "No data quality report has been generated yet (run `python -m secanalyst.pipeline ingest`)."
+        "No data quality report has been generated yet (run `python -m secanalyst.pipeline build`)."
     )
 footer()

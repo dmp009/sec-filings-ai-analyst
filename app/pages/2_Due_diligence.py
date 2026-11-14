@@ -104,7 +104,9 @@ with tab_radar:
     st.caption(
         "Number of 10-K passages (about 320 words each) in the relevant Items that match the "
         "topic's keywords (config/red_flags.yaml). A count shows where to read, not how bad "
-        "it is; measured precision on a fresh sample of 40 hits was 0.88 (docs/design/radar_labelled_hits.csv; one reader, wide margin of error). Zero means no match, e.g. no company discloses a material weakness or going "
+        "it is; measured precision on a fresh sample of 40 hits was "
+        "0.875 (35/40; docs/design/radar_labelled_hits.csv; one labeller, wide margin of "
+        "error). Zero means no match, e.g. no company discloses a material weakness or going "
         "concern doubt in these filings."
     )
 

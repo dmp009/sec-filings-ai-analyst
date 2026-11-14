@@ -32,11 +32,12 @@ st.subheader("Limitations")
 st.markdown(
     "- Eight companies only, last five fiscal years.\n"
     "- Fiscal years are not calendar-aligned (NVIDIA ends in January, Microsoft in June, Apple "
-    "in September, Broadcom in early November).\n"
+    "in September, Broadcom around the start of November).\n"
     "- Some definitions follow documented rulings (for example ROIC is n/m when invested "
     "capital is under 10% of total assets); see the tooltips on the Benchmarking page.\n"
     "- Not investment advice."
 )
 st.subheader("Links")
-st.markdown("- Source code: *link to be added*\n- Author: *link to be added*")
+st.markdown("- Source code: https://github.com/dmp009/sec-filings-ai-analyst\n"
+    "- Author: https://github.com/dmp009")
 footer()
