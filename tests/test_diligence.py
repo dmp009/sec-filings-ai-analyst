@@ -84,6 +84,46 @@ def test_diff_statuses_exact():
     assert by["changed"].prev is not None and by["changed"].curr is not None
 
 
+def test_minor_edit_is_separate_from_identical():
+    st = load_settings()
+    base = _1a(("Cyber attacks could disrupt our business.", R_CYBER))
+    edited = base.replace("ransomware", "malware")
+    out = diff_risks(
+        split_risks(base), split_risks(edited), FakeEmbedder(), 0.7, 0.9, st.risk_lexical
+    )
+    assert [c.status for c in out] == ["minor"]
+    same = diff_risks(split_risks(base), split_risks(base + "\n"), FakeEmbedder(), 0.7, 0.9, 0.85)
+    assert [c.status for c in same] == ["unchanged"]
+
+
+def test_paragraph_fallback_merges_fragments():
+    from secanalyst.diligence.riskdiff import _paragraph_risks
+
+    a = (
+        "We depend on suppliers and any disruption could harm our results "
+        + "of operations " * 6
+        + "and"
+    )
+    out = _paragraph_risks(
+        [a, "lower margins in future periods, which we describe above in detail here."]
+    )
+    assert len(out) == 1 and "lower margins" in out[0].text
+
+
+def test_radar_ignores_lists_short_passages_and_pointers():
+    ch = _chunks(
+        [
+            ("AAA", "2025", "1A", "Events such as fires, floods, earthquakes, wars, cyber attacks, terrorism, pandemics and outages."),
+            ("AAA", "2025", "3", "Legal proceedings: see Note 13 for a description of class action matters."),
+            ("AAA", "2025", "1A", "Tensions with Russia and Ukraine and other geopolitical events could affect us."),
+        ]
+    )  # fmt: skip
+    assert radar(ch, load_red_flags()).empty
+    short = pd.DataFrame(_chunks([("AAA", "2025", "1A", "Taiwan and China risks.")]))
+    short["text"] = "Taiwan and China risks."
+    assert radar(short, load_red_flags()).empty
+
+
 def test_thresholds_come_from_config():
     st = load_settings()
     assert 0.5 < st.risk_match < st.risk_change <= 1.0
@@ -106,7 +146,11 @@ def test_diff_filings_excludes_missing_1a_with_note():
     assert any("BBB" in n for n in notes)
 
 
+PAD = " The remainder of this passage describes ordinary operations and carries no keywords." * 4
+
+
 def _chunks(rows):
+    rows = [(t, fy, it, x + PAD) for t, fy, it, x in rows]
     return pd.DataFrame(
         [
             {"chunk_id": f"{t}-10-K-{fy}-{it}-{i:04d}", "filing_id": "x", "ticker": t,

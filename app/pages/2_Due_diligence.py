@@ -38,19 +38,26 @@ with tab_diff:
     fy_prev, fy_curr = d["fy_prev"].iloc[0], d["fy_curr"].iloc[0]
     st.markdown(f"**{ticker}: 10-K FY{fy_prev} compared with 10-K FY{fy_curr}**")
     counts = d["status"].value_counts()
-    cols = st.columns(4)
+    cols = st.columns(5)
     for col, (status, label) in zip(
         cols,
-        [("new", "New"), ("removed", "Removed"), ("changed", "Reworded"), ("unchanged", "Same")],
+        [
+            ("new", "New"),
+            ("removed", "Removed"),
+            ("changed", "Reworded"),
+            ("minor", "Minor edits"),
+            ("unchanged", "Identical"),
+        ],
         strict=True,
     ):
         col.metric(label, int(counts.get(status, 0)))
     if missing:
         st.caption(f"Not compared (no usable Item 1A in two 10-Ks): {', '.join(missing)}.")
     st.caption(
-        "Risks are matched one-to-one by embedding similarity of their opening text; a matched "
-        "risk is reworded when the embedding or the full wording differs enough. Section "
-        "layouts differ between companies, so a split or merged risk can appear as new plus "
+        "Risks are matched one-to-one by embedding similarity of their opening text. A matched "
+        "risk is Identical when the text is the same apart from whitespace, a Minor edit when "
+        "it was edited but stays close (high embedding similarity and at least 85% of its "
+        "words shared) and Reworded when it differs more. Section layouts differ between companies, so a split or merged risk can appear as new plus "
         "removed."
     )
 
@@ -72,13 +79,17 @@ with tab_diff:
                     st.write(r.prev_text if prev else r.curr_text)
                     st.badge(cite(ticker, fy_prev if prev else fy_curr))
 
-    t_new, t_rem, t_chg = st.tabs(["New risks", "Removed risks", "Reworded risks"])
+    t_new, t_rem, t_chg, t_min = st.tabs(
+        ["New risks", "Removed risks", "Reworded risks", "Minor edits"]
+    )
     with t_new:
         show(d[d["status"] == "new"])
     with t_rem:
         show(d[d["status"] == "removed"], prev=True)
     with t_chg:
         show(d[d["status"] == "changed"].sort_values("similarity"), both=True)
+    with t_min:
+        show(d[d["status"] == "minor"].sort_values("similarity"), both=True)
 
 with tab_radar:
     st.markdown("**Passages per topic, latest 10-K of each company**")
@@ -93,7 +104,7 @@ with tab_radar:
     st.caption(
         "Number of 10-K passages (about 320 words each) in the relevant Items that match the "
         "topic's keywords (config/red_flags.yaml). A count shows where to read, not how bad "
-        "it is; zero means no match, e.g. no company discloses a material weakness or going "
+        "it is; measured precision on a fresh sample of 40 hits was 0.83 (docs/design/radar_labelled_hits.csv), weakest for cybersecurity because Item 1C governance text also matches. Zero means no match, e.g. no company discloses a material weakness or going "
         "concern doubt in these filings."
     )
 

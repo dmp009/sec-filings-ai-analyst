@@ -27,6 +27,7 @@ def risk_citation(ticker: str, fy: str, period_end: str = "") -> str:
     return filing_citation(ticker, "10-K", fy, "1A", period_end)
 
 
+_SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z“\"(])")
 RADAR_COLUMNS = ["ticker", "fy", "category", "hits", "chunk_ids"]
 
 
@@ -39,8 +40,27 @@ def _pattern(keywords: list[str]) -> re.Pattern:
     return re.compile("|".join(parts), re.IGNORECASE)
 
 
-def _matches(text: str, pat: re.Pattern, exc: re.Pattern | None) -> bool:
-    return bool(pat.search(text)) and not (exc and exc.search(text))
+MIN_CHARS = 300  # shorter passages are headings or cross-references
+MAX_LIST_SEPARATORS = 4  # a sentence with this many commas, semicolons or bullets is a list
+
+
+def _matches(text: str, pat: re.Pattern, exc: re.Pattern | None, item: str = "") -> bool:
+    """Keyword in a core sentence: one that is not a long enumeration (a topic that is only one
+    entry in a list of ten is not what the passage is about) unless it names the topic twice.
+    Short passages and Item 3 'see Note X' pointers never match."""
+    if len(text) < MIN_CHARS or (exc and exc.search(text)):
+        return False
+    if (
+        item == "3"
+        and re.search(r"\bsee\b.{0,40}\bNote\b", text, re.IGNORECASE)
+        and len(text) < 800
+    ):
+        return False
+    for sent in _SENT.split(text):
+        n = len(pat.findall(sent))
+        if n and (n >= 2 or len(re.findall(r"[,;•]", sent)) < MAX_LIST_SEPARATORS):
+            return True
+    return False
 
 
 def radar(chunks: pd.DataFrame, red_flags: dict) -> pd.DataFrame:
@@ -55,7 +75,9 @@ def radar(chunks: pd.DataFrame, red_flags: dict) -> pd.DataFrame:
         exc = _pattern(["re:" + e for e in spec["exclude"]]) if spec.get("exclude") else None
         items = spec.get("items")
         cand = k if not items else k[k["item"].isin(items)]
-        hit = cand[[_matches(t, pat, exc) for t in cand["text"]]]
+        hit = cand[
+            [_matches(t, pat, exc, i) for t, i in zip(cand["text"], cand["item"], strict=True)]
+        ]
         for (ticker, fy), g in hit.groupby(["ticker", "fiscal_year"]):
             ids = g.sort_values("chunk_id")["chunk_id"].tolist()
             rows.append({"ticker": ticker, "fy": str(fy), "category": cat, "hits": len(ids),
@@ -65,7 +87,6 @@ def radar(chunks: pd.DataFrame, red_flags: dict) -> pd.DataFrame:
     )
 
 
-_SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z“\"(])")
 _PCT = re.compile(r"(\d{1,3}(?:\.\d+)?)\s?%")
 _REVENUE = re.compile(r"of\s+(?:our\s+|the\s+Company.s\s+)?(?:total\s+|net\s+|consolidated\s+)*"
                       r"(?:revenue|sales)", re.IGNORECASE)  # fmt: skip
@@ -105,6 +126,13 @@ def _sentence_pcts(sent: str) -> list[float]:
 
 
 def customer_concentration(chunks: pd.DataFrame) -> list[tuple[str, str, float, str]]:
+    """``(ticker, fy, percent, citation)``; see ``customer_concentration_detail``."""
+    return [r[:4] for r in customer_concentration_detail(chunks)]
+
+
+def customer_concentration_detail(
+    chunks: pd.DataFrame,
+) -> list[tuple[str, str, float, str, str]]:
     """``(ticker, fy, percent, citation)`` for every single customer or direct customer
     reported as X% of (total/net) revenue in a 10-K. A sentence that starts "For fiscal year
     YYYY" is booked to that year. Distributor, top-N and geographic shares are ignored."""
@@ -121,5 +149,5 @@ def customer_concentration(chunks: pd.DataFrame) -> list[tuple[str, str, float, 
                 seen.add(key)
                 hit = Hit(r.chunk_id, 0.0, r.ticker, r.form, str(r.fiscal_year), r.item, r.text,
                           getattr(r, "period_end", "") or "")  # fmt: skip
-                out.append((r.ticker, fy, pct, citation(hit)))
+                out.append((r.ticker, fy, pct, citation(hit), " ".join(sent.split())))
     return sorted(out, key=lambda x: (x[0], x[1], -x[2]))

@@ -46,7 +46,13 @@ def test_benchmarking_shows_na_cells():
 def test_due_diligence_shows_diff_and_radar():
     at = _run("pages/2_Due_diligence.py")
     assert not at.exception, [e.value for e in at.exception]
-    assert [m.label for m in at.metric] == ["New", "Removed", "Reworded", "Same"]
+    assert [m.label for m in at.metric] == [
+        "New",
+        "Removed",
+        "Reworded",
+        "Minor edits",
+        "Identical",
+    ]
     at.selectbox(key="dd_company").select("NVDA").run()
     assert not at.exception, [e.value for e in at.exception]
     assert any("NVDA: 10-K FY2025 compared with 10-K FY2026" in m.value for m in at.markdown)

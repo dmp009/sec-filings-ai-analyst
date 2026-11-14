@@ -27,27 +27,40 @@ Hand check of about 10 pairs each on AAPL (FY2025 vs FY2026) and NVDA (FY2025 vs
   0.37). Hence the extra lexical test; at 0.85 AAPL's stock-price risk (0.87, small edits) stays
   "same" and its regulatory-compliance risk (0.83, two new paragraphs of substance) is "reworded".
 
-Counts (new / removed / reworded / same): AAPL 1/0/14/13, AMZN 0/0/0/23, AVGO 4/4/16/20,
-GOOGL 2/2/10/13, META 0/0/7/33, MSFT 14/2/24/45, NVDA 5/2/2/19, TSLA 2/3/9/28.
+Statuses of a matched pair: identical (same text after whitespace normalisation), minor edit
+(edited but above `risk_change` and `risk_lexical`), reworded (below either bar). Microsoft's
+paragraph fallback merges fragments (lowercase or date starts, lines without final punctuation).
+
+Counts (new / removed / reworded / minor edits / identical), latest two 10-Ks:
+AAPL 1/0/14/11/2, AMZN 0/0/0/14/9, AVGO 4/4/16/17/3, GOOGL 2/2/10/12/1, META 0/0/7/20/13,
+MSFT 13/2/24/25/20, NVDA 5/2/2/14/5, TSLA 2/3/9/21/7. (Earlier "same" counts hid edits: AMZN
+rewrites sat at 0.89-0.98 word overlap.)
 
 Limitations: layouts differ, so a risk that a filer splits or merges between years shows as
 new plus removed; Microsoft is compared paragraph by paragraph.
 
 ## Red-flag radar precision
 
-Radar hits are 10-K passages whose Item is in the category's `items` and which match one
-keyword (`config/red_flags.yaml`). Precision = share of sampled hits where a reader would say the
-passage really discusses the topic as a risk or fact about the company.
+Radar hits are 10-K passages (at least 300 characters) whose Item is in the category's `items`,
+that match one keyword (`config/red_flags.yaml`) in a core sentence (a sentence with 4 or more
+commas, semicolons or bullets is an enumeration and only counts if it names the topic twice), and
+that are not Item 3 "see Note X" pointers. China needs China/Chinese/PRC/Taiwan/Hong Kong; bare
+"geopolitical", "tariffs" and "antitrust" are not keywords.
 
-| Round | Sample | Precision | Main false positives |
+Precision = share of sampled hits where the core sentence is really about the topic.
+
+| Round | Sample | Precision | Note |
 |---|---|---|---|
-| 1 original keywords, all Items | 39 | 0.41 (16/39) | auditor boilerplate ("risk that a material weakness exists"), investee going-concern policy text, "responsible AI" marketing, "administrative sanctions", loan facility in China |
-| 2 Items restricted, regex keywords, exclusions | 33 (only 33 hits available in the sampled strata) | 0.79 (26/33) | "GAIN AI Act" matched "AI Act", "single customer opportunity", hypothetical material-weakness sentence |
-| 3 final config | 40 | **0.85 (34/40)** | bare "geopolitical" and China in facility lists (China category is the weakest, 3 of 7 right) |
+| 1 original keywords | 39 | 0.41 | in-sample, used for tuning |
+| 2 Items + regex keywords | 33 | 0.79 | in-sample, used for tuning |
+| 3 "final" tuned config | 40 | 0.85 | in-sample: not a valid estimate; an independent 8-hit draw by the reviewer gave 0.4-0.5 (generic geopolitical lists, Russia/Ukraine, "antitrust and import/export regulations", cyber as one item in a list, Item 3 pointer stubs) |
+| 4 tightened rules (this version) | 40, fresh seed 2024, never used for tuning | **0.825 (33/40)** | out-of-sample; labels in `radar_labelled_hits.csv` |
 
-Final sample: 7 hits from each of six categories (seeded random draw) plus the first four of
-the seventh; material weakness and going concern have no hits in these filings (a correct
-result), so they are not in the sample.
+Per category in the holdout: AI regulation 7/7, China 7/7, litigation 6/6, customer concentration
+6/7, export controls 4/6, cybersecurity 3/7. Known weakness: Item 1C describes cybersecurity
+governance, so those passages count as cyber hits without being a red flag (4 of the 7 cyber
+labels), and export-control list fragments. 40 labels carry a wide interval (about +/-0.12), so
+read 0.825 as "roughly 0.7 to 0.95". Labels were assigned by one reader (the author).
 
 Customer concentration is parsed separately (single or direct customers, "X% of revenue"):
 NVDA FY2024 13% and 19% (indirect), FY2025 12% and 11%, FY2026 22% and 14%; AVGO FY2023 21%,

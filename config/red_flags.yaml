@@ -17,7 +17,13 @@ customer_concentration:
     - "The loss of any of our largest customers could materially harm our business."
 litigation:
   items: ["1A", "3", "8"]
-  keywords: ["legal proceedings", "class action", "lawsuit", "antitrust", "patent infringement", "investigation by"]
+  keywords:
+    - "legal proceedings"
+    - "class action"
+    - "re:lawsuits?"
+    - "re:antitrust (lawsuits?|litigation|investigations?|proceedings?|actions?|claims?|complaints?|cases?)"
+    - "patent infringement"
+    - "investigation by"
   seeds:
     - "We are subject to legal proceedings, including class action lawsuits and government investigations."
     - "An adverse outcome in antitrust or patent infringement litigation could require us to pay significant damages."
@@ -47,7 +53,7 @@ going_concern:
     - "A default under our debt covenants could accelerate repayment of our indebtedness."
 china_geopolitics:
   items: ["1A"]
-  keywords: ["china", "taiwan", "geopolitical", "trade tensions", "mainland china", "tariffs"]
+  keywords: ["china", "chinese", "PRC", "taiwan", "hong kong", "mainland china"]
   seeds:
     - "Our operations and supply chain in China and Taiwan expose us to geopolitical and trade tensions."
     - "Tariffs and retaliatory trade measures between the United States and China could harm our results."

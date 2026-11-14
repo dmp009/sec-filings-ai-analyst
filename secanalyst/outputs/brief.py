@@ -27,7 +27,7 @@ from secanalyst.answer.extractive import filing_citation
 from secanalyst.config import load_red_flags, load_settings
 from secanalyst.diligence.redflags import (
     CATEGORY_LABELS,
-    customer_concentration,
+    customer_concentration_detail,
     risk_citation,
 )
 from secanalyst.diligence.redflags import _pattern as _kw_pattern
@@ -95,7 +95,9 @@ def _best_sentence(rows: list, pat: re.Pattern) -> tuple[str, str]:
     """(sentence, item) of the first complete sentence of 8-40 words that has a keyword."""
     for r in rows:
         for s in re.split(r"(?<=[.!?])\s+(?=[A-Z“\"(])", r["text"]):
-            if pat.search(s) and 8 <= len(s.split()) <= 40:
+            words = s.split()
+            caps = sum(w.isupper() and len(w) > 1 for w in words)
+            if pat.search(s) and 8 <= len(words) <= 40 and caps / len(words) <= 0.6:
                 return s, r["item"]
     return _clip(rows[0]["text"], 170), rows[0]["item"]
 
@@ -123,11 +125,12 @@ def brief_content(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_D
 
     if len(diff):
         n = diff["status"].value_counts()
-        total = int(n.get("new", 0) + n.get("changed", 0) + n.get("unchanged", 0))
+        same = int(n.get("minor", 0) + n.get("unchanged", 0))
+        total = int(n.get("new", 0) + n.get("changed", 0)) + same
         c.changes = (
             f"10-K FY{fy_curr} against FY{diff['fy_prev'].iloc[0]}: {int(n.get('new', 0))} new, "
             f"{int(n.get('removed', 0))} removed and {int(n.get('changed', 0))} reworded risk "
-            f"factors out of {total}; {int(n.get('unchanged', 0))} unchanged."
+            f"factors out of {total}; {same} carried over ({int(n.get('minor', 0))} with minor edits)."
         )
         new = diff[diff["status"] == "new"]
         prev_cite = risk_citation(
@@ -159,9 +162,13 @@ def brief_content(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_D
             c.red_flags.append((CATEGORY_LABELS[r.category], int(r.hits), cit))
             if len(c.risks) < MAX_RISKS:
                 c.risks.append((f"{CATEGORY_LABELS[r.category]}: {_clip(sent, 170)}", cit))
-    for t, fy, pct, cit in customer_concentration(chunks):
-        if t == ticker and fy == c.fy:
-            c.concentration.append((f"A single customer was {pct:g}% of revenue (FY{fy}).", cit))
+    conc = [r for r in customer_concentration_detail(chunks) if r[0] == ticker]
+    if conc:
+        latest = max(r[1] for r in conc)  # filing fiscal year, not the XBRL label
+        for _, _, _, cit, sent in [r for r in conc if r[1] == latest][:3]:
+            c.concentration.append(
+                (f"Customer concentration (FY{latest}): " + _clip(sent, 190), cit)
+            )
     c.risks = c.risks[:MAX_RISKS]
     return c
 

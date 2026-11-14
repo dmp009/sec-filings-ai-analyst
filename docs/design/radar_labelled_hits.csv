@@ -1,0 +1,41 @@
+chunk_id,category,label,note
+NVDA-10-K-2026-1A-0058,ai_regulation,y,
+NVDA-10-K-2024-1A-0049,ai_regulation,y,
+NVDA-10-K-2025-1A-0057,ai_regulation,y,
+NVDA-10-K-2025-1A-0052,ai_regulation,y,
+META-10-K-2023-1A-0020,ai_regulation,y,
+GOOGL-10-K-2025-1A-0028,ai_regulation,y,
+NVDA-10-K-2024-1A-0050,ai_regulation,y,
+NVDA-10-K-2026-1A-0050,china_geopolitics,y,
+NVDA-10-K-2026-1A-0045,china_geopolitics,y,
+NVDA-10-K-2026-1A-0051,china_geopolitics,y,
+AVGO-10-K-2024-1A-0006,china_geopolitics,y,
+NVDA-10-K-2025-1A-0017,china_geopolitics,y,
+AVGO-10-K-2024-1A-0004,china_geopolitics,y,
+NVDA-10-K-2025-1A-0050,china_geopolitics,y,
+NVDA-10-K-2025-1A-0030,customer_concentration,y,
+AVGO-10-K-2025-1A-0026,customer_concentration,y,
+AVGO-10-K-2025-7-0016,customer_concentration,y,
+NVDA-10-K-2025-1A-0031,customer_concentration,n,"partner network, not customer concentration"
+AVGO-10-K-2024-1A-0016,customer_concentration,y,
+AVGO-10-K-2025-1A-0009,customer_concentration,y,
+AVGO-10-K-2025-1A-0025,customer_concentration,y,
+TSLA-10-K-2023-1C-0001,cybersecurity,n,"Item 1C exercise description, mitigation not a risk"
+AMZN-10-K-2023-1C-0001,cybersecurity,n,Item 1C governance text
+META-10-K-2023-1A-0092,cybersecurity,y,
+NVDA-10-K-2025-1C-0001,cybersecurity,n,Item 1C governance text
+AVGO-10-K-2025-1C-0000,cybersecurity,n,Item 1C program description
+TSLA-10-K-2024-1A-0040,cybersecurity,y,
+META-10-K-2023-1A-0094,cybersecurity,y,
+NVDA-10-K-2025-1A-0038,export_controls,y,
+AVGO-10-K-2024-1A-0004,export_controls,n,"list fragment, no statement about the topic"
+NVDA-10-K-2024-1A-0042,export_controls,y,
+NVDA-10-K-2026-1A-0048,export_controls,y,
+NVDA-10-K-2025-1A-0041,export_controls,y,
+AVGO-10-K-2025-1A-0004,export_controls,n,"list fragment, no statement about the topic"
+META-10-K-2025-8-0041,litigation,y,
+META-10-K-2025-8-0052,litigation,y,
+AMZN-10-K-2024-8-0045,litigation,y,
+MSFT-10-K-2024-8-0032,litigation,y,
+GOOGL-10-K-2025-1A-0034,litigation,y,
+META-10-K-2023-3-0000,litigation,y,

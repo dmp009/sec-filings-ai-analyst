@@ -1,5 +1,5 @@
 """Risk-factor diff between two consecutive 10-Ks: split Item 1A into risks, match them by
-embedding similarity, label each pair new / removed / changed / unchanged."""
+embedding similarity, label each pair new / removed / changed / minor / unchanged."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pandas as pd
 
 from secanalyst.retrieval.embedding import Embedder
 
-Status = Literal["new", "removed", "changed", "unchanged"]
+Status = Literal["new", "removed", "changed", "minor", "unchanged"]
 _SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z“\"(])")
 HEAD_MIN_WORDS, HEAD_MAX_WORDS = 5, 45
 HEAD_RATIO = 1.5  # the paragraph after a heading is at least this much longer than the heading
@@ -102,8 +102,15 @@ def split_risks(item_1a: str) -> list[Risk]:
 def _paragraph_risks(lines: list[str]) -> list[Risk]:
     """Fallback for layouts without stand-alone headings (e.g. Microsoft): each paragraph of
     at least 30 words is a unit titled with its first sentence."""
-    out = []
+    merged: list[str] = []
     for ln in lines:
+        frag = ln[0].islower() or re.match(r"^\(?\d{1,2}[,)]|^\d{4}\b", ln)
+        if merged and (frag or merged[-1][-1] not in '.?!:;”")'):
+            merged[-1] += " " + ln  # continuation of the previous paragraph
+        else:
+            merged.append(ln)
+    out = []
+    for ln in merged:
         if len(ln.split()) >= PARA_MIN_WORDS:
             body = ln.lstrip("•- ").strip()
             title = _SENT.split(body)[0]
@@ -131,9 +138,10 @@ def diff_risks(
     change: float = 0.97, lexical: float = 0.85,
 ) -> list[RiskChange]:  # fmt: skip
     """One-to-one greedy matching on cosine similarity (best pairs first). A pair at or above
-    ``match`` is the same risk: ``unchanged`` when the embedding similarity is at least
-    ``change`` and the full texts share at least ``lexical`` of their distinct words (the
-    embedding only sees the opening of a risk), else ``changed``.
+    ``match`` is the same risk. ``unchanged``: identical after whitespace normalisation.
+    ``minor``: edited, but the embedding similarity is at least ``change`` and the full texts
+    share at least ``lexical`` of their distinct words (the embedding only sees the opening of
+    a risk). ``changed``: anything below those bars.
     Unmatched old risks are ``removed``, unmatched current ones ``new``."""
     if not prev and not curr:
         return []
@@ -152,7 +160,11 @@ def diff_risks(
         used_p.add(i), used_c.add(j)
         s = float(sim[i, j])
         same = s >= change and _jaccard(prev[i].text, curr[j].text) >= lexical
-        out.append(RiskChange("unchanged" if same else "changed", prev[i], curr[j], s))
+        if " ".join(prev[i].text.split()) == " ".join(curr[j].text.split()):
+            status = "unchanged"
+        else:
+            status = "minor" if same else "changed"
+        out.append(RiskChange(status, prev[i], curr[j], s))
     out += [RiskChange("removed", p, None, None) for i, p in enumerate(prev) if i not in used_p]
     out += [RiskChange("new", None, c, None) for j, c in enumerate(curr) if j not in used_c]
     return out
