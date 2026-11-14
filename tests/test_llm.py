@@ -112,3 +112,16 @@ def test_usage_fails_closed_and_atomic(tmp_path):
     u.unlink()
     assert answer_cached("q", HITS, c, **{**kw(tmp_path), "usage_path": u})
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_verify_sign_aware():
+    def ok(chunk, t):
+        return verify_answer(DraftAnswer(t, ["c1"]), [hit("c1", chunk)]) == []
+
+    assert not ok("Sales grew 12 percent.", "Sales fell -12%.")
+    assert not ok("Sales grew 12 percent.", "Sales fell \u221212%.")
+    assert ok("Sales grew 12 percent.", "Sales grew 12%.")
+    assert ok("Net loss of $(12).", "A loss of -12.")
+    assert ok("Margin fell -3 percent.", "Margin fell -3%.") and ok("Down -3%.", "Down 3%.")
+    assert ok("From 2024-2026 sales grew.", "In 2026.")
+    assert not ok("Sales were 12 million.", "Sales were -12 million.")
