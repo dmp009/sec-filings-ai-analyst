@@ -9,6 +9,7 @@ import streamlit as st
 
 from app import common
 from app.common import footer, get_settings, setup
+from secanalyst.answer import llm
 from secanalyst.answer.extractive import answer, citation
 from secanalyst.config import load_questions
 
@@ -68,6 +69,21 @@ if query.strip():
     if res.message:
         st.warning(res.message)
     else:
+        draft = None
+        try:
+            key = llm.get_api_key()
+            draft = llm.answer_cached(
+                query, res.hits, llm.AnthropicClient(settings.llm_model, key) if key else None,
+                cap=settings.daily_llm_cap,
+            )  # fmt: skip
+        except Exception:  # noqa: BLE001
+            draft = None  # never block the page; extractive answers stay
+        if draft:
+            st.subheader("AI-drafted answer (verified against the cited passages)")
+            st.write(draft.answer)
+            by_id = {h.chunk_id: h for h in res.hits}
+            for cid in draft.citations:
+                st.badge(citation(by_id[cid]))
         st.subheader("Key sentences (extractive, not AI-written)")
         for s in res.sentences:
             st.markdown(f"> {s.text}")

@@ -210,6 +210,32 @@ def run_eval(snapshot_dir: Path = snapshot.SNAPSHOT_DIR, embedder=None) -> dict:
     return res
 
 
+def ai(refresh: bool = False, snapshot_dir: Path = snapshot.SNAPSHOT_DIR, embedder=None) -> int:
+    """Draft verified answers for config/questions.yaml (cached in data/ai_cache/). Without
+    ANTHROPIC_API_KEY it only logs and returns 0. Returns the number of verified answers."""
+    from secanalyst.answer import llm
+    from secanalyst.config import load_questions
+    from secanalyst.retrieval.search import Index, search
+
+    if not llm.get_api_key():
+        print("ai: ANTHROPIC_API_KEY is not set; skipping drafted answers (extractive only)")
+        return 0
+    from secanalyst.retrieval.embedding import FastEmbedder
+
+    st = load_settings()
+    embedder = embedder or FastEmbedder()
+    idx = Index.load(snapshot_dir)
+    client = llm.AnthropicClient()
+    ok = 0
+    for q in load_questions():
+        filters = {"ticker": q["ticker"]} if q.get("ticker") else None
+        hits = search(idx, q["question"], filters, k=st.top_k, embedder=embedder)
+        d = llm.answer_cached(q["question"], hits, client, refresh=refresh)
+        print(f"ai: {q['id']}: {'verified' if d else 'no verified answer'}")
+        ok += d is not None
+    return ok
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(prog="secanalyst.pipeline")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -223,6 +249,8 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("index", help="chunk + embed sections into chunks.parquet and vectors.npy")
     sub.add_parser("diligence", help="risk-factor diff and red-flag radar parquet files")
     sub.add_parser("eval", help="recall@5 and MRR on data/eval/retrieval_eval.yaml")
+    a = sub.add_parser("ai", help="optional verified drafted answers (needs ANTHROPIC_API_KEY)")
+    a.add_argument("--refresh", action="store_true", help="ignore the cache and redraft")
     args = ap.parse_args(argv)
     if args.cmd == "ingest":
         ingest()
@@ -243,6 +271,8 @@ def main(argv: list[str] | None = None) -> None:
         diligence()
     elif args.cmd == "eval":
         run_eval()
+    elif args.cmd == "ai":
+        ai(refresh=args.refresh)
 
 
 if __name__ == "__main__":
