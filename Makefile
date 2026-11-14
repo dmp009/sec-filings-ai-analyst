@@ -1,7 +1,7 @@
 PYTHON ?= python3.13
 PY ?= .venv/bin/python
 
-.PHONY: install test lint pipeline app readme figures
+.PHONY: install test lint ingest build app readme figures
 
 install:
 	$(PYTHON) -m venv .venv
@@ -13,8 +13,14 @@ test:
 lint:
 	$(PY) -m ruff check .
 
-pipeline:
+ingest:
 	$(PY) -m secanalyst.pipeline ingest
+
+build:
+	$(PY) -m secanalyst.pipeline build
+	$(PY) -m secanalyst.pipeline index
+	$(PY) -m secanalyst.pipeline diligence
+	$(PY) -m secanalyst.pipeline eval
 
 app:
 	$(PY) -m streamlit run app/Home.py
