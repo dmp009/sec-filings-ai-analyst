@@ -116,8 +116,15 @@ def split_sentences(text: str) -> list[str]:
     return out
 
 
+def _position(chunk_id: str) -> int:
+    tail = chunk_id.rsplit("-", 1)[-1]
+    return int(tail) if tail.isdigit() else 0
+
+
 def _jaccard(a: str, b: str) -> float:
-    x, y = set(tokenize(a)), set(tokenize(b))
+    """Token-set Jaccard with numbers (years, amounts) ignored."""
+    x = {t for t in tokenize(a) if not any(c.isdigit() for c in t)}
+    y = {t for t in tokenize(b) if not any(c.isdigit() for c in t)}
     return len(x & y) / len(x | y) if x | y else 0.0
 
 
@@ -126,7 +133,13 @@ def key_sentences(
 ) -> list[Sentence]:
     """Top ``n`` sentences from the hits: 0.7 * embedding similarity + 0.3 * query-term overlap
     (overlap only when no embedder). At most 2 sentences per passage, no duplicates."""
-    cands = [(h, s) for h in hits for s in split_sentences(h.text)]
+    cands = []
+    for h in hits:
+        sents = split_sentences(h.text)
+        # overlap means a chunk after the first may begin mid-sentence: skip its first sentence
+        if sents and _position(h.chunk_id) > 0 and h.text.startswith(sents[0][:30]):
+            sents = sents[1:]
+        cands += [(h, s) for s in sents]
     if not cands:
         return []
     q = set(tokenize(query))
@@ -137,16 +150,29 @@ def key_sentences(
         score = 0.7 * sim + 0.3 * overlap
     else:
         score = overlap
-    out, seen, per_chunk = [], set(), {}
+    out, seen, per_chunk, fys = [], set(), {}, []
     for i in np.argsort(-score, kind="stable"):
         h, s = cands[i]
         if s in seen or per_chunk.get(h.chunk_id, 0) >= 2:
             continue
-        if any(_jaccard(s, o.text) >= 0.8 for o in out):
+        dup = next(
+            (
+                j
+                for j, o in enumerate(out)
+                if _jaccard(s, o.text) >= (0.7 if fys[j] != h.fy else 0.8)
+            ),
+            None,
+        )
+        if dup is not None:
+            if h.fy > fys[dup] and out[dup].text != s:  # keep the latest fiscal year
+                out[dup] = Sentence(s, h.chunk_id, citation(h), float(score[i]))
+                fys[dup] = h.fy
+                seen.add(s)
             continue
         seen.add(s)
         per_chunk[h.chunk_id] = per_chunk.get(h.chunk_id, 0) + 1
         out.append(Sentence(s, h.chunk_id, citation(h), float(score[i])))
+        fys.append(h.fy)
         if len(out) == n:
             break
     return out

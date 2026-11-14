@@ -141,3 +141,21 @@ def test_key_sentences_skip_near_duplicates():
     texts = [s.text for s in out]
     assert not (a in texts and b in texts)
     assert c in texts
+
+
+def test_key_sentences_skip_cut_first_sentence_of_later_chunk():
+    cut = "Data Protection Commission regulates our privacy compliance across the European Union."
+    ok = "We are subject to European Union privacy regulation and regulatory inquiries."
+    h = Hit("META-10-K-2025-1A-0003", 0.9, "META", "10-K", "2025", "1A", f"{cut} {ok}", "2025-12-31")
+    h0 = Hit("META-10-K-2025-1A-0000", 0.9, "META", "10-K", "2025", "1A", f"{cut} {ok}", "2025-12-31")
+    assert [s.text for s in key_sentences("European Union regulation", [h], None)] == [ok]
+    assert cut in [s.text for s in key_sentences("European Union regulation", [h0], None)]
+
+
+def test_key_sentences_near_duplicate_across_years_keeps_latest():
+    old = "We refer to customers who purchase products directly from NVIDIA as direct customers, such as AIBs, distributors, ODMs and OEMs."
+    new = "We refer to customers who purchase products directly from NVIDIA as direct customers, such as AIBs, distributors, ODMs, OEMs, CSPs and system integrators."
+    ho = Hit("N-10-K-2025-7-0000", 0.9, "NVDA", "10-K", "2025", "7", old, "2025-01-26")
+    hn = Hit("N-10-K-2026-7-0000", 0.8, "NVDA", "10-K", "2026", "7", new, "2026-01-25")
+    out = [s.text for s in key_sentences("direct customers", [ho, hn], None)]
+    assert out == [new]
