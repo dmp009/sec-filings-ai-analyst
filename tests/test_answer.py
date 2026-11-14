@@ -100,3 +100,44 @@ def test_ask_page_answers_and_declines(monkeypatch, embedder):
     assert not at.exception, [e.value for e in at.exception]
     assert any("No relevant passage found" in w.value for w in at.warning)
     assert any("Educational project" in c.value for c in at.caption)
+
+
+from secanalyst.answer.extractive import split_sentences
+
+
+def test_split_drops_fragments_and_headings():
+    frags = [
+        "in part by outsourcing partners located in Asia and elsewhere around the world.",
+        "(\u201cBroadcom\u201d), a Delaware corporation, designs and supplies many semiconductor products.",
+        "Overview and Basis of Presentation Overview Broadcom Inc.",
+        "(see the discussion in this section for more detail and other related matters.",
+        "This sentence has no terminal punctuation but is otherwise long enough to keep",
+    ]
+    for f in frags:
+        assert split_sentences(f) == [], f
+    good = "The company depends heavily on outsourcing partners for most of its production volume."
+    assert split_sentences("THE COMPANY AND ITS RISKS " + good) == [good]
+    assert split_sentences(good) == [good]
+    long = "Overview and Basis of Presentation Overview Broadcom Inc. is a global technology leader."
+    out = split_sentences(long)
+    assert out and out[0].startswith("Broadcom Inc. is")
+
+
+def test_split_keeps_balanced_paren_and_quoted_end():
+    out = split_sentences(
+        "(See Note 4 for details) the company records revenue when control transfers to buyers. "
+        'Management called this approach "the most prudent way to account for revenue."'
+    )
+    assert any(s.endswith('revenue."') for s in out)
+
+
+def test_key_sentences_skip_near_duplicates():
+    a = "Our revenue is concentrated among a small number of customers in fiscal year 2026."
+    b = "Our revenue is concentrated among a small number of customers in fiscal year 2025."
+    c = "A single customer accounted for most of our net revenue and receivables balance."
+    h = Hit("c1", 0.9, "AVGO", "10-K", "2026", "1A", f"{a} {c}", "2026-11-01")
+    h2 = Hit("c2", 0.8, "AVGO", "10-K", "2025", "1A", b, "2025-11-02")
+    out = key_sentences("revenue concentrated customers", [h, h2], None, n=5)
+    texts = [s.text for s in out]
+    assert not (a in texts and b in texts)
+    assert c in texts

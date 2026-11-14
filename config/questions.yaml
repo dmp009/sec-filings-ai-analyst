@@ -22,7 +22,7 @@ questions:
   question: How does Meta describe regulatory risks in the European Union?
 - id: q08
   ticker: AVGO
-  question: How concentrated is Broadcom's revenue among its largest customers?
+  question: Does Broadcom depend on a small number of customers for its net revenue?
 - id: q09
   ticker: TSLA
   question: What does Tesla disclose about supply chain and battery cell dependence?

@@ -45,13 +45,80 @@ def citation(hit: Hit) -> str:
     return filing_citation(hit.ticker, hit.form, hit.fy, hit.item, hit.period_end)
 
 
+_HEADING_WORDS = {"Overview", "Presentation", "Summary", "Introduction", "Background", "Highlights"}
+_CONNECT = {"and", "of", "the", "for", "to", "in", "on"}
+_STARTERS = {"We", "Our", "The", "A", "An", "It", "Failures", "In", "If", "As", "Some", "Many"}
+_LEAD_HEADINGS = {"Competition", "Overview", "Seasonality", "Customers", "Suppliers"}
+MAX_WORDS = 80
+_END = re.compile(r"[.!?][\"”’')]?$")
+
+
+def _strip_heading(s: str) -> str:
+    """Drop a glued heading run ("Overview and Basis of Presentation Overview Broadcom Inc.
+    is ...") up to the real subject of the sentence."""
+    words = s.split()
+    caps = 0
+    while caps < len(words) and words[caps].isupper() and len(words[caps]) > 1:
+        caps += 1
+    if caps >= 3:
+        s = " ".join(words[caps:])
+    # glued section heading: cut after the last heading word among the first ten words
+    words = s.split()
+    cut = max(
+        (i for i, w in enumerate(words[:10]) if w in _HEADING_WORDS and i > 0), default=None
+    )
+    if cut is not None and all(w[0].isupper() or w in _CONNECT for w in words[: cut + 1]):
+        s = " ".join(words[cut + 1 :])
+        words = s.split()
+    # Title-Case heading glued to the sentence: "Net Revenue A relatively small ...",
+    # "Antitrust Matters We are subject ..."
+    last = None
+    for i, w in enumerate(words[:16]):
+        if i >= 1 and w in _STARTERS:
+            last = i
+        elif not (w[0].isupper() or w in _CONNECT):
+            break
+    if last is not None:
+        s = " ".join(words[last:])
+    words = s.split()
+    for i in range(4, min(len(words) - 1, 10)):
+        if words[i][0].isupper() and words[i + 1] in ("is", "are", "was", "were"):
+            if all(x[0].isupper() or x in _CONNECT for x in words[:i]):
+                s = " ".join(words[i:])
+            break
+    words = s.split()
+    if len(words) > 3 and words[0] in _LEAD_HEADINGS and words[1][0].isupper():
+        s = " ".join(words[1:])
+    return s.strip()
+
+
+def _valid(s: str) -> bool:
+    first = next((ch for ch in s if ch.isalpha()), "")
+    if not first or first.islower() or "\u2022" in s or len(s.split()) > MAX_WORDS:
+        return False
+    if s.startswith("(") and s.count(")") != s.count("("):
+        return False
+    if s.startswith(("(\u201c", '("')):
+        return False
+    if not _END.search(s):
+        return False
+    head = s.split()[:3]
+    return not (len(head) == 3 and all(w.isupper() for w in head if any(c.isalpha() for c in w)))
+
+
 def split_sentences(text: str) -> list[str]:
     out = []
     for s in _SENT.split(text):
         s = s.strip().lstrip("\u2022").strip()
-        if len(s.split()) >= MIN_WORDS:
+        s = _strip_heading(s)
+        if len(s.split()) >= MIN_WORDS and _valid(s):
             out.append(s)
     return out
+
+
+def _jaccard(a: str, b: str) -> float:
+    x, y = set(tokenize(a)), set(tokenize(b))
+    return len(x & y) / len(x | y) if x | y else 0.0
 
 
 def key_sentences(
@@ -74,6 +141,8 @@ def key_sentences(
     for i in np.argsort(-score, kind="stable"):
         h, s = cands[i]
         if s in seen or per_chunk.get(h.chunk_id, 0) >= 2:
+            continue
+        if any(_jaccard(s, o.text) >= 0.8 for o in out):
             continue
         seen.add(s)
         per_chunk[h.chunk_id] = per_chunk.get(h.chunk_id, 0) + 1
