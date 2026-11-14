@@ -35,10 +35,14 @@ def _item_label(item: str) -> str:
     return f"Item {item}"
 
 
-def citation(hit: Hit) -> str:
+def filing_citation(ticker: str, form: str, fy: str, item: str, period_end: str = "") -> str:
     """``NVDA · 10-K FY2026 (period end 2026-01-25) · Item 1A``"""
-    pe = f" (period end {hit.period_end})" if hit.period_end else ""
-    return f"{hit.ticker} · {hit.form} FY{hit.fy}{pe} · {_item_label(hit.item)}"
+    pe = f" (period end {period_end})" if period_end else ""
+    return f"{ticker} · {form} FY{fy}{pe} · {_item_label(item)}"
+
+
+def citation(hit: Hit) -> str:
+    return filing_citation(hit.ticker, hit.form, hit.fy, hit.item, hit.period_end)
 
 
 def split_sentences(text: str) -> list[str]:

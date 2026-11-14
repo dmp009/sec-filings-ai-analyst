@@ -153,6 +153,39 @@ def index(snapshot_dir: Path = snapshot.SNAPSHOT_DIR, embedder=None) -> int:
     return size
 
 
+def diligence(
+    snapshot_dir: Path = snapshot.SNAPSHOT_DIR, embedder=None, reuse_diff: bool = False
+) -> dict:
+    """Risk-factor diffs (latest two 10-Ks per company) -> risk_diff.parquet and the red-flag
+    radar over chunks.parquet -> radar.parquet. ``reuse_diff`` keeps an existing risk_diff
+    (the sections did not change) so nothing is re-embedded."""
+    from secanalyst.config import load_red_flags
+    from secanalyst.diligence.redflags import radar
+    from secanalyst.diligence.riskdiff import diff_filings
+
+    d = Path(snapshot_dir)
+    st = load_settings()
+    out = d / "risk_diff.parquet"
+    if reuse_diff and out.exists():
+        print("risk_diff: sections unchanged, reused")
+    else:
+        from secanalyst.retrieval.embedding import FastEmbedder
+
+        secs = pd.read_parquet(d / "fact_sections.parquet")
+        rows, notes = diff_filings(
+            secs, embedder or FastEmbedder(), st.risk_match, st.risk_change, st.risk_lexical
+        )
+        rows.to_parquet(out, compression="zstd", index=False)
+        for n in notes:
+            print("risk_diff:", n)
+        print(f"risk_diff: {len(rows)} rows -> {out}")
+    chunks = pd.read_parquet(d / "chunks.parquet")
+    rad = radar(chunks, load_red_flags())
+    rad.to_parquet(d / "radar.parquet", compression="zstd", index=False)
+    print(f"radar: {len(rad)} rows -> {d / 'radar.parquet'}")
+    return {"risk_diff": out, "radar": d / "radar.parquet"}
+
+
 EVAL_FILTERS = ("ticker", "fy")  # what a user sets in the Ask page: company and year
 EVAL_PATH = REPO_ROOT / "data" / "eval" / "retrieval_eval.yaml"
 
@@ -188,6 +221,7 @@ def main(argv: list[str] | None = None) -> None:
         help="do not re-embed when chunks.parquet is newer than fact_sections.parquet",
     )
     sub.add_parser("index", help="chunk + embed sections into chunks.parquet and vectors.npy")
+    sub.add_parser("diligence", help="risk-factor diff and red-flag radar parquet files")
     sub.add_parser("eval", help="recall@5 and MRR on data/eval/retrieval_eval.yaml")
     args = ap.parse_args(argv)
     if args.cmd == "ingest":
@@ -197,12 +231,16 @@ def main(argv: list[str] | None = None) -> None:
         secs_file = d / "fact_sections.parquet"
         before = secs_file.read_bytes() if secs_file.exists() else None
         build()  # rewrites every parquet, so mtimes are useless: compare the sections content
-        if args.skip_index and (d / "chunks.parquet").exists() and before == secs_file.read_bytes():
+        unchanged = before == secs_file.read_bytes()
+        if args.skip_index and (d / "chunks.parquet").exists() and unchanged:
             print("index: sections unchanged, skipped")
         else:
             index()
+        diligence(reuse_diff=args.skip_index and unchanged)
     elif args.cmd == "index":
         index()
+    elif args.cmd == "diligence":
+        diligence()
     elif args.cmd == "eval":
         run_eval()
 

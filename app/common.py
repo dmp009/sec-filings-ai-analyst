@@ -76,3 +76,35 @@ def get_embedder():
         return FastEmbedder()
     except Exception:  # noqa: BLE001 - any load failure means "use the BM25 fallback"
         return None
+
+
+@st.cache_data
+def get_risk_diff():
+    import pandas as pd
+
+    return pd.read_parquet(ROOT / "data" / "snapshot" / "risk_diff.parquet")
+
+
+@st.cache_data
+def get_radar():
+    import pandas as pd
+
+    return pd.read_parquet(ROOT / "data" / "snapshot" / "radar.parquet")
+
+
+@st.cache_data
+def get_chunks():
+    """Passage text and metadata only (no vectors): the diligence page needs no embedding."""
+    import pandas as pd
+
+    return pd.read_parquet(ROOT / "data" / "snapshot" / "chunks.parquet")
+
+
+@st.cache_data
+def get_customer_concentration():
+    import pandas as pd
+
+    from secanalyst.diligence.redflags import customer_concentration
+
+    rows = customer_concentration(get_chunks())
+    return pd.DataFrame(rows, columns=["ticker", "fy", "percent", "citation"])

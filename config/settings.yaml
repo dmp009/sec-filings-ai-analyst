@@ -18,6 +18,10 @@ out_of_scope_patterns:
   - '\bprice target\b'
   - '\btrading at\b'
   - '\bshould i (buy|sell)\b'
+# Risk-factor diff (cosine of bge-small embeddings of title + opening text); see docs/methodology
+risk_match: 0.90
+risk_change: 0.97
+risk_lexical: 0.85
 daily_llm_cap: 50
 user_agent_default: "sec-filings-ai-analyst research project"
 disclaimer: "Educational project — not investment advice. Source: SEC EDGAR."

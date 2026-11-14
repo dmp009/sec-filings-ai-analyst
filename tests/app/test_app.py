@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PAGES = [
     "Home.py",
     "pages/1_Ask_the_filings.py",
+    "pages/2_Due_diligence.py",
     "pages/3_Benchmarking.py",
     "pages/5_Data_quality.py",
     "pages/6_About.py",
@@ -39,3 +40,16 @@ def test_benchmarking_shows_na_cells():
     assert not at.exception
     cells = " ".join(str(v) for d in at.dataframe for v in d.value.to_numpy().ravel())
     assert "n/a" in cells
+
+
+def test_due_diligence_shows_diff_and_radar():
+    at = _run("pages/2_Due_diligence.py")
+    assert not at.exception, [e.value for e in at.exception]
+    assert [m.label for m in at.metric] == ["New", "Removed", "Reworded", "Same"]
+    at.selectbox(key="dd_company").select("NVDA").run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert any("NVDA: 10-K FY2025 compared with 10-K FY2026" in m.value for m in at.markdown)
+    assert len(at.expander) > 0  # risk cards (each carries a citation badge)
+    at.selectbox(key="dd_radar_company").select("NVDA").run()
+    at.selectbox(key="dd_cat").select("Export controls").run()
+    assert not at.exception, [e.value for e in at.exception]

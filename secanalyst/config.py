@@ -28,6 +28,9 @@ class Settings(BaseModel):
     score_floor: float
     lexical_floor: float = 0.55
     out_of_scope_patterns: list[str] = []
+    risk_match: float = 0.90
+    risk_change: float = 0.97
+    risk_lexical: float = 0.85
     daily_llm_cap: int = 50
     user_agent_default: str
     disclaimer: str

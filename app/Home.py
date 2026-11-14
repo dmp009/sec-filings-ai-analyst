@@ -53,8 +53,12 @@ with v1:
     )
     st.page_link("pages/5_Data_quality.py", label="Open Data quality")
 with v2:
+    st.markdown(
+        "**Due diligence** — available now. What changed in each company's risk factors "
+        "between its latest two 10-Ks, a red-flag radar and customer concentration."
+    )
+    st.page_link("pages/2_Due_diligence.py", label="Open Due diligence")
     st.markdown("**Company explorer** — coming soon.")
-    st.markdown("**Risk and change tracker** — coming soon.")
 st.markdown("See also: " + "About (what, how, limitations) in the sidebar.")
 
 footer()
