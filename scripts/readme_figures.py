@@ -43,7 +43,9 @@ def margins_figure(ratios) -> Path:
     keep = ratios.merge(latest[["ticker", "fiscal_year_label"]], on=["ticker", "fiscal_year_label"])
     fig, axes = plt.subplots(1, 2, figsize=(8.5, 3.4), sharey=True)
     for ax, ratio, title in zip(
-        axes, ["operating_margin", "fcf_margin"], ["Operating margin", "Free-cash-flow margin"],
+        axes,
+        ["operating_margin", "fcf_margin"],
+        ["Operating margin", "Free-cash-flow margin"],
         strict=True,
     ):
         d = keep[(keep["ratio"] == ratio) & (keep["status"] == "ok")].sort_values("value")

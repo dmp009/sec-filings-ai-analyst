@@ -60,7 +60,11 @@ def render_benchmark_table(ratios: pd.DataFrame) -> str:
     lines = ["| " + " | ".join(head) + " |", "|" + "---|" * 3 + "--:|" * len(KEY_RATIOS)]
     for ticker, g in keep.groupby("ticker", sort=True):
         by = g.set_index("ratio")
-        cells = [ticker, g["fiscal_year_label"].iloc[0], str(pd.Timestamp(g["period_end"].iloc[0]).date())]
+        cells = [
+            ticker,
+            g["fiscal_year_label"].iloc[0],
+            str(pd.Timestamp(g["period_end"].iloc[0]).date()),
+        ]
         cells += [_fmt(by.loc[n, "value"], by.loc[n, "status"], kind) for n, _, kind in KEY_RATIOS]
         lines.append("| " + " | ".join(cells) + " |")
     return "\n".join(lines)

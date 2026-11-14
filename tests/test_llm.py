@@ -125,3 +125,11 @@ def test_verify_sign_aware():
     assert ok("Margin fell -3 percent.", "Margin fell -3%.") and ok("Down -3%.", "Down 3%.")
     assert ok("From 2024-2026 sales grew.", "In 2026.")
     assert not ok("Sales were 12 million.", "Sales were -12 million.")
+
+
+def test_verify_leading_minus():
+    chunk = "Revenue grew 12 percent to $11.2 billion in fiscal 2026. Headcount was 1,200."
+    for t in ["-12%", "\n\u221212%", "(-12%)", "x\n-12%"]:
+        assert verify_answer(DraftAnswer(t, ["c1"]), [hit("c1", chunk)]), t
+    assert verify_answer(DraftAnswer("12%", ["c1"]), [hit("c1", chunk)]) == []
+    assert verify_answer(DraftAnswer("2024-2026", ["c1"]), [hit("c1", "2024-2026")]) == []

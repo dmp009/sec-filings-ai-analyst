@@ -19,7 +19,7 @@ def _negative(text: str, m: re.Match) -> bool:
     before = text[m.start() - 1] if m.start() else ""
     before2 = text[m.start() - 2] if m.start() > 1 else ""
     after = text[m.end()] if m.end() < len(text) else ""
-    if before in "-\u2212" and before and not (before2.isalnum() or before2 in ")%"):
+    if before and before in "-\u2212" and not (before2.isalnum() or (before2 and before2 in ")%")):
         return True
     return before == "(" and after == ")"
 

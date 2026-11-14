@@ -27,7 +27,10 @@ def _ratios():
         for name, _, _ in KEY_RATIOS:
             rows.append(("AAPL", fy, pe, name, 0.25, "ok", None))
     rows.append(("AAPL", "2026", "2026-09-26", "roic", None, "n/m", "x"))
-    df = pd.DataFrame(rows, columns=["ticker", "fiscal_year_label", "period_end", "ratio", "value", "status", "reason"])
+    df = pd.DataFrame(
+        rows,
+        columns=["ticker", "fiscal_year_label", "period_end", "ratio", "value", "status", "reason"],
+    )
     return df.drop_duplicates(["ticker", "fiscal_year_label", "ratio"], keep="last")
 
 
