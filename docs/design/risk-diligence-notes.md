@@ -54,13 +54,13 @@ Precision = share of sampled hits where the core sentence is really about the to
 | 1 original keywords | 39 | 0.41 | in-sample, used for tuning |
 | 2 Items + regex keywords | 33 | 0.79 | in-sample, used for tuning |
 | 3 "final" tuned config | 40 | 0.85 | in-sample: not a valid estimate; an independent 8-hit draw by the reviewer gave 0.4-0.5 (generic geopolitical lists, Russia/Ukraine, "antitrust and import/export regulations", cyber as one item in a list, Item 3 pointer stubs) |
-| 4 tightened rules (this version) | 40, fresh seed 2024, never used for tuning | **0.825 (33/40)** | out-of-sample; labels in `radar_labelled_hits.csv` |
+| 4 tightened rules | 40, fresh seed 2024, never used for tuning | 0.825 (33/40) | out-of-sample; cyber 3/7 because Item 1C governance text matched, which led to round 5 (`round` 1 in the CSV) |
+| 5 cybersecurity restricted to Item 1A (final) | 40, fresh seed 777, drawn after the last rule change, no overlap with round 4 | **0.875 (35/40)** | out-of-sample; `round` 2 in `radar_labelled_hits.csv` |
 
-Per category in the holdout: AI regulation 7/7, China 7/7, litigation 6/6, customer concentration
-6/7, export controls 4/6, cybersecurity 3/7. Known weakness: Item 1C describes cybersecurity
-governance, so those passages count as cyber hits without being a red flag (4 of the 7 cyber
-labels), and export-control list fragments. 40 labels carry a wide interval (about +/-0.12), so
-read 0.825 as "roughly 0.7 to 0.95". Labels were assigned by one reader (the author).
+Per category in the round-5 holdout: AI regulation 7/7, China 6/7, customer concentration 6/7,
+cybersecurity 6/7, export controls 5/6, litigation 5/6. Remaining false positives: a privacy-law
+mention of China, a "no customer reached 10%" sentence, topics that are only one entry in a list.
+40 labels carry a wide interval (about +/-0.10), so read 0.875 as "roughly 0.75 to 0.95". Labels were assigned by one reader (the author).
 
 Customer concentration is parsed separately (single or direct customers, "X% of revenue"):
 NVDA FY2024 13% and 19% (indirect), FY2025 12% and 11%, FY2026 22% and 14%; AVGO FY2023 21%,

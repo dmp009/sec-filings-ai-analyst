@@ -1,41 +1,81 @@
-chunk_id,category,label,note
-NVDA-10-K-2026-1A-0058,ai_regulation,y,
-NVDA-10-K-2024-1A-0049,ai_regulation,y,
-NVDA-10-K-2025-1A-0057,ai_regulation,y,
-NVDA-10-K-2025-1A-0052,ai_regulation,y,
-META-10-K-2023-1A-0020,ai_regulation,y,
-GOOGL-10-K-2025-1A-0028,ai_regulation,y,
-NVDA-10-K-2024-1A-0050,ai_regulation,y,
-NVDA-10-K-2026-1A-0050,china_geopolitics,y,
-NVDA-10-K-2026-1A-0045,china_geopolitics,y,
-NVDA-10-K-2026-1A-0051,china_geopolitics,y,
-AVGO-10-K-2024-1A-0006,china_geopolitics,y,
-NVDA-10-K-2025-1A-0017,china_geopolitics,y,
-AVGO-10-K-2024-1A-0004,china_geopolitics,y,
-NVDA-10-K-2025-1A-0050,china_geopolitics,y,
-NVDA-10-K-2025-1A-0030,customer_concentration,y,
-AVGO-10-K-2025-1A-0026,customer_concentration,y,
-AVGO-10-K-2025-7-0016,customer_concentration,y,
-NVDA-10-K-2025-1A-0031,customer_concentration,n,"partner network, not customer concentration"
-AVGO-10-K-2024-1A-0016,customer_concentration,y,
-AVGO-10-K-2025-1A-0009,customer_concentration,y,
-AVGO-10-K-2025-1A-0025,customer_concentration,y,
-TSLA-10-K-2023-1C-0001,cybersecurity,n,"Item 1C exercise description, mitigation not a risk"
-AMZN-10-K-2023-1C-0001,cybersecurity,n,Item 1C governance text
-META-10-K-2023-1A-0092,cybersecurity,y,
-NVDA-10-K-2025-1C-0001,cybersecurity,n,Item 1C governance text
-AVGO-10-K-2025-1C-0000,cybersecurity,n,Item 1C program description
-TSLA-10-K-2024-1A-0040,cybersecurity,y,
-META-10-K-2023-1A-0094,cybersecurity,y,
-NVDA-10-K-2025-1A-0038,export_controls,y,
-AVGO-10-K-2024-1A-0004,export_controls,n,"list fragment, no statement about the topic"
-NVDA-10-K-2024-1A-0042,export_controls,y,
-NVDA-10-K-2026-1A-0048,export_controls,y,
-NVDA-10-K-2025-1A-0041,export_controls,y,
-AVGO-10-K-2025-1A-0004,export_controls,n,"list fragment, no statement about the topic"
-META-10-K-2025-8-0041,litigation,y,
-META-10-K-2025-8-0052,litigation,y,
-AMZN-10-K-2024-8-0045,litigation,y,
-MSFT-10-K-2024-8-0032,litigation,y,
-GOOGL-10-K-2025-1A-0034,litigation,y,
-META-10-K-2023-3-0000,litigation,y,
+chunk_id,category,label,note,round
+NVDA-10-K-2026-1A-0058,ai_regulation,y,,1
+NVDA-10-K-2024-1A-0049,ai_regulation,y,,1
+NVDA-10-K-2025-1A-0057,ai_regulation,y,,1
+NVDA-10-K-2025-1A-0052,ai_regulation,y,,1
+META-10-K-2023-1A-0020,ai_regulation,y,,1
+GOOGL-10-K-2025-1A-0028,ai_regulation,y,,1
+NVDA-10-K-2024-1A-0050,ai_regulation,y,,1
+NVDA-10-K-2026-1A-0050,china_geopolitics,y,,1
+NVDA-10-K-2026-1A-0045,china_geopolitics,y,,1
+NVDA-10-K-2026-1A-0051,china_geopolitics,y,,1
+AVGO-10-K-2024-1A-0006,china_geopolitics,y,,1
+NVDA-10-K-2025-1A-0017,china_geopolitics,y,,1
+AVGO-10-K-2024-1A-0004,china_geopolitics,y,,1
+NVDA-10-K-2025-1A-0050,china_geopolitics,y,,1
+NVDA-10-K-2025-1A-0030,customer_concentration,y,,1
+AVGO-10-K-2025-1A-0026,customer_concentration,y,,1
+AVGO-10-K-2025-7-0016,customer_concentration,y,,1
+NVDA-10-K-2025-1A-0031,customer_concentration,n,"partner network, not customer concentration",1
+AVGO-10-K-2024-1A-0016,customer_concentration,y,,1
+AVGO-10-K-2025-1A-0009,customer_concentration,y,,1
+AVGO-10-K-2025-1A-0025,customer_concentration,y,,1
+TSLA-10-K-2023-1C-0001,cybersecurity,n,"Item 1C exercise description, mitigation not a risk",1
+AMZN-10-K-2023-1C-0001,cybersecurity,n,Item 1C governance text,1
+META-10-K-2023-1A-0092,cybersecurity,y,,1
+NVDA-10-K-2025-1C-0001,cybersecurity,n,Item 1C governance text,1
+AVGO-10-K-2025-1C-0000,cybersecurity,n,Item 1C program description,1
+TSLA-10-K-2024-1A-0040,cybersecurity,y,,1
+META-10-K-2023-1A-0094,cybersecurity,y,,1
+NVDA-10-K-2025-1A-0038,export_controls,y,,1
+AVGO-10-K-2024-1A-0004,export_controls,n,"list fragment, no statement about the topic",1
+NVDA-10-K-2024-1A-0042,export_controls,y,,1
+NVDA-10-K-2026-1A-0048,export_controls,y,,1
+NVDA-10-K-2025-1A-0041,export_controls,y,,1
+AVGO-10-K-2025-1A-0004,export_controls,n,"list fragment, no statement about the topic",1
+META-10-K-2025-8-0041,litigation,y,,1
+META-10-K-2025-8-0052,litigation,y,,1
+AMZN-10-K-2024-8-0045,litigation,y,,1
+MSFT-10-K-2024-8-0032,litigation,y,,1
+GOOGL-10-K-2025-1A-0034,litigation,y,,1
+META-10-K-2023-3-0000,litigation,y,,1
+NVDA-10-K-2024-1A-0054,ai_regulation,y,,2
+NVDA-10-K-2026-1A-0039,ai_regulation,y,,2
+NVDA-10-K-2026-1A-0054,ai_regulation,y,,2
+GOOGL-10-K-2024-1A-0028,ai_regulation,y,,2
+NVDA-10-K-2025-1A-0037,ai_regulation,y,,2
+NVDA-10-K-2026-1A-0038,ai_regulation,y,,2
+NVDA-10-K-2025-1A-0056,ai_regulation,y,,2
+NVDA-10-K-2025-1A-0040,china_geopolitics,y,,2
+TSLA-10-K-2025-1A-0041,china_geopolitics,n,"privacy laws in Asia-Pacific, not geopolitics",2
+AAPL-10-K-2025-1A-0002,china_geopolitics,y,,2
+NVDA-10-K-2024-1A-0045,china_geopolitics,y,,2
+NVDA-10-K-2026-1A-0047,china_geopolitics,y,,2
+NVDA-10-K-2026-1A-0024,china_geopolitics,y,,2
+NVDA-10-K-2025-1A-0043,china_geopolitics,y,,2
+AVGO-10-K-2024-7-0015,customer_concentration,y,,2
+NVDA-10-K-2024-1A-0032,customer_concentration,y,,2
+AVGO-10-K-2023-7-0015,customer_concentration,y,,2
+AVGO-10-K-2023-1A-0019,customer_concentration,y,,2
+NVDA-10-K-2026-1A-0031,customer_concentration,y,,2
+NVDA-10-K-2025-7-0014,customer_concentration,n,states that no customer reached 10%,2
+AVGO-10-K-2024-1A-0010,customer_concentration,y,,2
+AVGO-10-K-2023-1A-0017,cybersecurity,y,,2
+AAPL-10-K-2024-1A-0003,cybersecurity,n,cyber only one entry in a list of hazards,2
+TSLA-10-K-2025-1A-0022,cybersecurity,y,,2
+MSFT-10-K-2025-1A-0013,cybersecurity,y,,2
+META-10-K-2025-1A-0100,cybersecurity,y,,2
+META-10-K-2025-1A-0097,cybersecurity,y,,2
+TSLA-10-K-2025-1A-0041,cybersecurity,y,,2
+MSFT-10-K-2025-1A-0025,export_controls,y,,2
+NVDA-10-K-2024-1A-0045,export_controls,y,,2
+NVDA-10-K-2026-1A-0042,export_controls,y,,2
+META-10-K-2024-1A-0092,export_controls,n,"anti-money-laundering list, sanctions incidental",2
+NVDA-10-K-2025-7-0003,export_controls,y,,2
+NVDA-10-K-2024-1A-0041,export_controls,y,,2
+TSLA-10-K-2023-1A-0040,litigation,n,"data-protection investigations, weak litigation signal",2
+AAPL-10-K-2025-1A-0021,litigation,y,,2
+META-10-K-2023-1A-0058,litigation,y,,2
+META-10-K-2024-8-0051,litigation,y,,2
+AMZN-10-K-2025-8-0006,litigation,y,,2
+META-10-K-2024-8-0038,litigation,y,,2

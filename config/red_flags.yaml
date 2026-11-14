@@ -83,7 +83,7 @@ export_controls:
     - "New license requirements could prevent us from shipping products to China and other markets."
     - "Our customers or suppliers may be added to the Entity List, disrupting our sales."
 cybersecurity:
-  items: ["1A", "1C"]
+  items: ["1A"]
   keywords:
     - "re:cyber[- ]?attacks?"
     - "data breach"
