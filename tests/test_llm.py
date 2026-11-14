@@ -91,3 +91,24 @@ def test_ai_without_key_exits_zero(monkeypatch, capsys):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     pipeline.main(["ai"])
     assert "ANTHROPIC_API_KEY" in capsys.readouterr().out
+
+
+def test_verify_unit_aware():
+    h = [hit("c1", "Sales rose 12 percent to $11.2 billion in 2026.")]
+    ok = lambda t: verify_answer(DraftAnswer(t, ["c1"]), h) == []
+    assert ok("Sales were $11.2 billion.") and ok("Up 12%.") and ok("In 2026.")
+    assert not ok("Sales were $12 million.")
+    assert not ok("Sales were $11.2 million.")
+    assert not ok("Sales were $12 billion.")
+    assert not ok("Up 11.2%.")
+
+
+def test_usage_fails_closed_and_atomic(tmp_path):
+    u = tmp_path / "u.json"
+    u.write_text("{broken")
+    c = FakeClient(GOOD)
+    assert answer_cached("q", HITS, c, **{**kw(tmp_path), "usage_path": u}) is None
+    assert c.calls == 0
+    u.unlink()
+    assert answer_cached("q", HITS, c, **{**kw(tmp_path), "usage_path": u})
+    assert not list(tmp_path.glob("*.tmp"))

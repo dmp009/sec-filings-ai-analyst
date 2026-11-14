@@ -78,7 +78,8 @@ if query.strip():
             )  # fmt: skip
         except Exception:  # noqa: BLE001
             draft = None  # never block the page; extractive answers stay
-        if draft:
+            st.caption("AI draft unavailable")
+        if draft and "not found in the filings" not in draft.answer.lower():
             st.subheader("AI-drafted answer (verified against the cited passages)")
             st.write(draft.answer)
             by_id = {h.chunk_id: h for h in res.hits}

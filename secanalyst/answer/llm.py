@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import sys
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path
@@ -103,20 +104,29 @@ def cache_key(question: str, hits) -> str:
 
 
 def calls_today(usage_path: Path = USAGE_PATH) -> int:
-    try:
-        d = json.loads(Path(usage_path).read_text(encoding="utf-8"))
-        return int(d["count"]) if d.get("date") == date.today().isoformat() else 0
-    except (OSError, ValueError, KeyError, TypeError):
+    """Calls made today. A missing file is 0; one that exists but cannot be read fails closed
+    (counts as over any cap)."""
+    path = Path(usage_path)
+    if not path.exists():
         return 0
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+        return int(d["count"]) if d.get("date") == date.today().isoformat() else 0
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return sys.maxsize
 
 
 def _bump(usage_path: Path) -> None:
+    # Best-effort cap: on Streamlit Cloud the filesystem is ephemeral, so the counter resets on
+    # restart; an Anthropic console spend limit is the real backstop.
     usage_path = Path(usage_path)
     usage_path.parent.mkdir(parents=True, exist_ok=True)
-    usage_path.write_text(
+    tmp = usage_path.with_name(usage_path.name + ".tmp")
+    tmp.write_text(
         json.dumps({"date": date.today().isoformat(), "count": calls_today(usage_path) + 1}),
         encoding="utf-8",
     )
+    os.replace(tmp, usage_path)
 
 
 def answer_cached(

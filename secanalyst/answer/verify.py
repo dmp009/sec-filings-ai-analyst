@@ -3,16 +3,30 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal, InvalidOperation
 
-_NUM = re.compile(r"\d[\d,]*(?:\.\d+)?")
+_NUM = re.compile(
+    r"(?:\$|USD\s?)?(\d[\d,]*(?:\.\d+)?)\s*"
+    r"(%|percent|per cent|thousand|million|billion|trillion|bn|m|b)?(?![a-z])",
+    re.IGNORECASE,
+)
+_SCALE = {"thousand": "K", "million": "M", "m": "M", "billion": "B", "bn": "B", "b": "B",
+          "trillion": "T"}  # fmt: skip
 
 
-def numbers(text: str) -> set[str]:
-    """Numeric cores of every number in ``text``: "$1.2 billion", "15%" and "2026" give
-    "1.2", "15" and "2026" (thousands commas and currency/unit words are dropped)."""
+def numbers(text: str) -> set[tuple[str, str, bool]]:
+    """(value, scale, is_percent) for every number in ``text``. "$1.2 billion" and "1.2 billion"
+    both give ("1.2", "B", False); "12%" and "12 percent" give ("12", "", True); a bare year
+    gives (2026, "", False). A "$" is ignored, so scale and percent must match exactly."""
     out = set()
-    for m in _NUM.findall(text):
-        out.add(m.replace(",", "").rstrip("."))
+    for val, unit in _NUM.findall(text):
+        try:
+            v = format(Decimal(val.replace(",", "").rstrip(".,")).normalize(), "f")
+        except InvalidOperation:
+            continue
+        u = unit.lower()
+        out.add((v, "" if u in ("%", "percent", "per cent") else _SCALE.get(u, ""),
+                 u in ("%", "percent", "per cent")))  # fmt: skip
     return out
 
 
@@ -28,6 +42,6 @@ def verify_answer(draft, hits) -> list[str]:
     support = set()
     for c in cites:
         support |= numbers(by_id[c].text)
-    for n in sorted(numbers(draft.answer) - support):
-        problems.append(f"number {n} not found in the cited passages")
+    for v, sc, pct in sorted(numbers(draft.answer) - support):
+        problems.append(f"number {v}{'%' if pct else sc} not found in the cited passages")
     return problems
