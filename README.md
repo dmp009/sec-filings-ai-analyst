@@ -4,7 +4,7 @@
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-**Live demo:** coming soon
+**Live demo:** [sec-filings-ai-analyst.streamlit.app](https://sec-filings-ai-analyst.streamlit.app/) (Streamlit Community Cloud)
 
 An analyst tool over the 10-K and 10-Q filings and the XBRL financial data of eight large US
 companies (Apple, Microsoft, NVIDIA, Amazon, Alphabet, Meta, Broadcom, Tesla). You ask a question
