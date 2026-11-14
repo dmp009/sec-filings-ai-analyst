@@ -35,7 +35,7 @@ Data as of 2026-11-13 (SEC EDGAR).
 | fact_sections | 254 |
 | fact_financials | 1095 |
 | fact_ratios | 600 |
-| fact_chunks | 0 |
+| fact_chunks | 0 (declared, empty; passages are stored in chunks.parquet: 4,376) |
 | fact_ai_answers | 0 |
 | meta | 2 |
 

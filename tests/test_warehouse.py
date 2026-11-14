@@ -185,3 +185,10 @@ def test_pipeline_build_from_a_tiny_manifest(tmp_path):
     assert s.execute("SELECT value FROM meta WHERE key = 'as_of'").fetchone()[0] == "2026-11-13"
     assert s.execute("SELECT count(*) FROM fact_ratios").fetchone()[0] > 0
     assert "# Data quality report" in report.read_text()
+
+
+def test_quality_report_explains_empty_fact_chunks(tmp_path):
+    con = _con(items=("1", "7"))
+    out = tmp_path / "report.md"
+    write_quality_report(run_quality_checks(con), out, con)
+    assert "| fact_chunks | 0 (declared, empty; passages are stored in chunks.parquet" in out.read_text()

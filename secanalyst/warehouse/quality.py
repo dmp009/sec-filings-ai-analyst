@@ -310,6 +310,14 @@ def key_ratio_table(con: duckdb.DuckDBPyConnection) -> list[str]:
     return lines
 
 
+def _chunk_count() -> int:
+    """Rows of the committed chunks.parquet (0 when it does not exist yet)."""
+    from secanalyst.warehouse.snapshot import SNAPSHOT_DIR
+
+    f = Path(SNAPSHOT_DIR) / "chunks.parquet"
+    return len(pd.read_parquet(f, columns=["chunk_id"])) if f.exists() else 0
+
+
 def write_quality_report(
     issues: list[QualityIssue],
     path: Path | str = "data_quality_report.md",
@@ -337,7 +345,12 @@ def write_quality_report(
         lines += ["", "## Row counts", "", "| Table | Rows |", "|---|---|"]
         for table in TABLES:
             n = con.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-            lines.append(f"| {table} | {n} |")
+            note = ""
+            if table == "fact_chunks" and n == 0:
+                n_chunks = _chunk_count()
+                count = f": {n_chunks:,}" if n_chunks else ""
+                note = f" (declared, empty; passages are stored in chunks.parquet{count})"
+            lines.append(f"| {table} | {n}{note} |")
         if con.execute("SELECT count(*) FROM fact_ratios").fetchone()[0]:
             lines += [
                 "",
