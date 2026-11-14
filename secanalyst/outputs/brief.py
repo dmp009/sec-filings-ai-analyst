@@ -64,7 +64,7 @@ class BriefContent:
 def _fmt(value, unit: str) -> str:
     if value is None or pd.isna(value):
         return "n/a"
-    return f"{value * 100:.1f}%" if unit == "pct" else f"{value:.1f}x"
+    return f"{value * 100:.1f}%" if unit == "pct" else f"{value:.2f}x"
 
 
 def _clip(text: str, n: int = LINE_CHARS) -> str:
@@ -91,15 +91,52 @@ def _metrics(con, ticker: str) -> tuple[str, list[tuple[str, str, str]]]:
     return fy, out
 
 
-def _best_sentence(rows: list, pat: re.Pattern) -> tuple[str, str]:
-    """(sentence, item) of the first complete sentence of 8-40 words that has a keyword."""
+_SPLIT = re.compile(
+    r"(?<=[.!?])(?<!U\.S\.)(?<!U\.K\.)(?<!Inc\.)(?<!Corp\.)(?<!Co\.)(?<!No\.)\s+(?=[A-Z“\"(])"
+)
+_RISKS_HEADING = re.compile(
+    r"^(?:(?:[A-Z][\w,&'/-]*|and|of|the|for|to)\s+){1,8}Risks\s+(?=[A-Z])"
+)
+_BAD_TITLE = re.compile(r"(?i)\bforegoing\b|^(any|each) (one )?of (the|these)\b")
+_ONE_CUSTOMER = re.compile(r"(?i)\b(one|single|a|another)\b[^.]{0,40}\bcustomers?\b")
+
+
+def _clean_sentence(s: str) -> str:
+    """Strip a leading ALL-CAPS heading run (2+ words) or a Title-Case '... Risks' heading."""
+    words = s.split()
+    n = 0
+    while n < len(words) and words[n].isupper() and len(words[n]) > 1 or (
+        n < len(words) and n > 0 and words[n] in (",", "&") and words[n - 1].isupper()
+    ):
+        n += 1
+    if n >= 2:
+        s = " ".join(words[n:])
+    return _RISKS_HEADING.sub("", s.strip(), count=1)
+
+
+def _title_ok(t: str) -> bool:
+    return len(t.split()) >= 5 and not _BAD_TITLE.search(t.strip())
+
+
+def _best_sentence(rows: list, pat: re.Pattern, category: str = "") -> tuple[str, str]:
+    """(sentence, item) of the first complete sentence of 8-40 words that has a keyword;
+    the sentence is empty when none qualifies."""
     for r in rows:
-        for s in re.split(r"(?<=[.!?])\s+(?=[A-Z“\"(])", r["text"]):
+        for raw in _SPLIT.split(r["text"]):
+            s = _clean_sentence(raw)
             words = s.split()
             caps = sum(w.isupper() and len(w) > 1 for w in words)
+            if not (s[:1].isupper() and re.search(r"[.!?][\"”’)]?$", s)):
+                continue
+            if (
+                category == "customer_concentration"
+                and re.search(r"(?i)distributors?", s)
+                and not _ONE_CUSTOMER.search(s)
+            ):
+                continue
             if pat.search(s) and 8 <= len(words) <= 40 and caps / len(words) <= 0.6:
                 return s, r["item"]
-    return _clip(rows[0]["text"], 170), rows[0]["item"]
+    return "", rows[0]["item"]  # no clean sentence: the caller omits the risk line
 
 
 def brief_content(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_DIR) -> BriefContent:
@@ -144,6 +181,7 @@ def brief_content(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_D
         pool = list(new["curr_title"]) + list(
             diff[diff["status"] == "changed"].sort_values("similarity")["curr_title"]
         )
+        pool = [t for t in pool if _title_ok(t)]
         for t in pool[:3]:
             c.risks.append((_clip(t), cite))
     else:
@@ -156,11 +194,13 @@ def brief_content(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_D
         spec = load_red_flags()
         for r in cur.itertuples():
             sent, it = _best_sentence(
-                [by_id.loc[i] for i in r.chunk_ids], _kw_pattern(spec[r.category]["keywords"])
+                [by_id.loc[i] for i in r.chunk_ids],
+                _kw_pattern(spec[r.category]["keywords"]),
+                r.category,
             )
             cit = filing_citation(ticker, "10-K", r.fy, it, period.get(r.fy, ""))
             c.red_flags.append((CATEGORY_LABELS[r.category], int(r.hits), cit))
-            if len(c.risks) < MAX_RISKS:
+            if sent and len(c.risks) < MAX_RISKS:
                 c.risks.append((f"{CATEGORY_LABELS[r.category]}: {_clip(sent, 170)}", cit))
     conc = [r for r in customer_concentration_detail(chunks) if r[0] == ticker]
     if conc:
@@ -200,8 +240,8 @@ def brief_pdf(ticker: str, con, index, snapshot_dir: Path | str = SNAPSHOT_DIR) 
         HRFlowable(width="100%", thickness=0.6, color=colors.HexColor("#1f3a5f"), spaceBefore=3),
         Paragraph("Key metrics against the peer median (eight companies, latest fiscal year)", h2),
     ]  # fmt: skip
-    rows = [["Metric", c.ticker, "Peer median"]] + [list(m) for m in c.metrics]
-    t = Table(rows, colWidths=[60 * mm, 30 * mm, 30 * mm], hAlign="LEFT")
+    rows = [["Metric", c.ticker, "Peer median (incl. this company)"]] + [list(m) for m in c.metrics]
+    t = Table(rows, colWidths=[60 * mm, 25 * mm, 55 * mm], hAlign="LEFT")
     t.setStyle(
         TableStyle(
             [
