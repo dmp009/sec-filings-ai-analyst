@@ -19,7 +19,7 @@ from secanalyst.warehouse.snapshot import load_snapshot
 
 
 def setup(title: str) -> None:
-    st.set_page_config(page_title=f"SEC filings analyst - {title}", page_icon=None, layout="wide")
+    st.set_page_config(page_title=f"SEC filings analyst - {title}", page_icon=":material/description:", layout="wide")
 
 
 @st.cache_resource(show_spinner="Loading data snapshot...")
@@ -54,7 +54,7 @@ def get_financials():
 
 
 def footer() -> None:
-    st.divider()
+    st.space("medium")
     st.caption(get_settings().disclaimer)
     st.caption(f"Data as of {get_as_of()} (committed snapshot; no live data).")
 
